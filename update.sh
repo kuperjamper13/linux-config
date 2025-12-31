@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# 💎 AESTHETIC CONFIGURATION (NEON TERMINAL THEME)
+# 💎 AESTHETIC CONFIGURATION
 # ==============================================================================
 # Reset
 NC='\033[0m'
@@ -24,166 +24,128 @@ ICON_ASK="[${MAGENTA}??${NC}]"
 ICON_INF="[${CYAN}::${NC}]"
 ICON_GIT="[${YELLOW}GIT${NC}]"
 ICON_PKG="[${BLUE}PKG${NC}]"
+ICON_SUDO="[${RED}ADMIN${NC}]"
 
 # Configuration
 REPO_URL="https://github.com/kuperjamper13/linux-config.git"
 LOCAL_REPO="$HOME/linux-config"
 CONFIG_DIR="$HOME/.config"
 
-function draw_line {
-    echo -e "${DIM}────────────────────────────────────────────────────────────${NC}"
-}
-
-function show_header {
-    clear
-    echo -e "${MAGENTA}"
-    echo "  ██████  ██    ██  ███▄    █  ▄▄▄       "
-    echo "▒██    ▒  ██    ██  ██ ▀█   █ ▒████▄     "
-    echo "░ ▓██▄    █    █  ██  ▀█ ██ ▒██  ▀█▄   "
-    echo "  ▒   ██▒ ▓██▄██▓  ██▒  ▐▌██ ░██▄▄▄▄██  "
-    echo "▒██████▒▒  ▒██▒   ▒██░   ▓██ ░ ▓█   ▓██▒ "
-    echo "▒ ▒▓▒ ▒ ░  ▒ ▒░   ░ ▒░   ▒ ▒   ▒▒   ▓▒█░ "
-    echo "░ ░▒  ░ ░  ░ ░░   ░ ░░   ░ ▒░   ▒   ▒▒ ░ "
-    echo "░  ░  ░      ░       ░   ░ ░    ░   ▒    "
-    echo "      ░                          ░  ░    "
-    echo -e "${NC}"
-    echo -e "${CYAN}   // SYSTEM UPDATE & DOTFILES SYNC //${NC}"
-    draw_line
-}
-
 function step_title {
-    echo -e "\n${CYAN}┌──[ STEP $1/5 ] :: $2${NC}"
+    echo -e "\n${CYAN}┌──[ STEP $1/6 ] :: $2${NC}"
     echo -e "${CYAN}└──────────────────────────────────────────${NC}"
 }
 
-show_header
+clear
+echo -e "${MAGENTA}   // SYSTEM UPDATE & DOTFILES SYNC v3.0 //${NC}"
 
 # ==============================================================================
-# 1. SYSTEM UPDATE (NEW)
+# 1. SYSTEM MAINTENANCE
 # ==============================================================================
-step_title "1" "SYSTEM MAINTENANCE"
+step_title "1" "SYSTEM PACKAGES"
 
-echo -e "${ICON_PKG} Updating Arch Official Repositories..."
+echo -e "${ICON_PKG} Updating Official Repos..."
 sudo pacman -Syu --noconfirm
 
-if [ $? -eq 0 ]; then
-    echo -e "${ICON_OK} Core system updated."
-else
-    echo -e "${ICON_ERR} Pacman failed. Check internet."
-    # We don't exit here, we try to continue
-fi
-
 if command -v yay &> /dev/null; then
-    echo -e "\n${ICON_PKG} Updating AUR (Yay)..."
+    echo -e "${ICON_PKG} Updating AUR..."
     yay -Syu --noconfirm
-    echo -e "${ICON_OK} AUR packages updated."
 else
-    echo -e "${ICON_INF} Yay not found, skipping AUR update."
+    echo -e "${ICON_INF} Yay not found. Skipping AUR."
 fi
 
 # ==============================================================================
 # 2. GIT SYNC
 # ==============================================================================
-step_title "2" "SYNCHRONIZING REPO"
+step_title "2" "REPO SYNC"
 
-# Check if we need to Clone or Pull
 if [ -d "$LOCAL_REPO" ]; then
-    echo -e "${ICON_GIT} Repo found at ${BOLD}$LOCAL_REPO${NC}"
-    echo -e "${ICON_INF} Pulling latest changes..."
+    echo -e "${ICON_GIT} Pulling changes at $LOCAL_REPO..."
     cd "$LOCAL_REPO"
-    
-    # Stash local changes to prevent conflicts, pull, then apply stash
     git stash -q
     git pull origin main
     git stash pop -q &>/dev/null
-    
-    echo -e "${ICON_OK} Up to date."
 else
-    echo -e "${ICON_GIT} Repo not found. Cloning fresh..."
+    echo -e "${ICON_GIT} Cloning fresh repo..."
     git clone "$REPO_URL" "$LOCAL_REPO"
-    if [ $? -ne 0 ]; then
-        echo -e "${ICON_ERR} Clone failed. Check internet connection."
-        exit 1
-    fi
-    echo -e "${ICON_OK} Cloned successfully."
 fi
 
-# Locate the actual config source (handling .dotfiles subfolder)
+# Intelligent Source Detection
 if [ -d "$LOCAL_REPO/.dotfiles" ]; then
     DOTFILES_SOURCE="$LOCAL_REPO/.dotfiles"
-    echo -e "${ICON_INF} Using source: ${WHITE}$DOTFILES_SOURCE${NC}"
 else
     DOTFILES_SOURCE="$LOCAL_REPO"
-    echo -e "${ICON_INF} Using source: ${WHITE}$DOTFILES_SOURCE (Root)${NC}"
 fi
 
 # ==============================================================================
-# 3. KEYMAP INJECTION
+# 3. SDDM THEME ENGINE (NEW)
 # ==============================================================================
-step_title "3" "HARDWARE ADAPTATION"
+step_title "3" "LOGIN SCREEN (SDDM)"
 
-# Detect System Keymap
+echo -e "${ICON_INF} Installing 'Sugar Dark' theme..."
+# Check if theme is installed, if not, install it via yay
+if ! pacman -Qs sddm-sugar-dark &> /dev/null; then
+    yay -S --noconfirm sddm-sugar-dark
+fi
+
+echo -e "${ICON_SUDO} Applying SDDM Configuration..."
+if [ -f "$DOTFILES_SOURCE/sddm/sddm.conf" ]; then
+    # We must COPY this file, not link it, because SDDM runs as root
+    sudo cp "$DOTFILES_SOURCE/sddm/sddm.conf" /etc/sddm.conf
+    echo -e "${ICON_OK} Configuration applied to /etc/sddm.conf"
+else
+    echo -e "${ICON_ERR} No sddm.conf found in dotfiles."
+fi
+
+# ==============================================================================
+# 4. KEYMAP INJECTION
+# ==============================================================================
+step_title "4" "HARDWARE ADAPTATION"
+
 DETECTED_KEYMAP=$(grep KEYMAP /etc/vconsole.conf | cut -d= -f2)
 [[ -z "$DETECTED_KEYMAP" ]] && DETECTED_KEYMAP="us"
+echo -e "${ICON_INF} Keymap: ${BOLD}$DETECTED_KEYMAP${NC}"
 
-echo -e "${ICON_INF} System Keymap: ${BOLD}$DETECTED_KEYMAP${NC}"
-
-# Inject into Hyprland Config
 HYPR_CONF="$DOTFILES_SOURCE/hypr/hyprland.conf"
-
 if [ -f "$HYPR_CONF" ]; then
-    echo -e "${ICON_INF} Injecting keymap into local config copy..."
-    # We use sed to replace standard US layout with the detected one
     sed -i "s/kb_layout = us/kb_layout = $DETECTED_KEYMAP/g" "$HYPR_CONF"
     sed -i "s/kb_layout = es/kb_layout = $DETECTED_KEYMAP/g" "$HYPR_CONF" 
-    echo -e "${ICON_OK} Keymap applied."
-else
-    echo -e "${ICON_ERR} Warning: hyprland.conf not found."
+    echo -e "${ICON_OK} Keymap injected."
 fi
 
 # ==============================================================================
-# 4. SYMLINK ENGINE
+# 5. USER CONFIG LINKS
 # ==============================================================================
-step_title "4" "UPDATING LINKS"
+step_title "5" "USER DOTFILES"
 
 mkdir -p "$CONFIG_DIR"
 
 link_config() {
     TARGET=$1
     if [ -d "$DOTFILES_SOURCE/$TARGET" ]; then
-        # Remove old link or folder (force replace)
         rm -rf "$CONFIG_DIR/$TARGET"
         ln -sf "$DOTFILES_SOURCE/$TARGET" "$CONFIG_DIR/$TARGET"
-        echo -e "${ICON_OK} Linked: ${WHITE}$TARGET${NC}"
+        echo -e "${ICON_OK} Linked: $TARGET"
     else
-        echo -e "${ICON_ERR} Missing in repo: $TARGET"
+        echo -e "${ICON_ERR} Missing: $TARGET"
     fi
 }
 
-# List of modules to link
 link_config "hypr"
 link_config "waybar"
 link_config "kitty"
 link_config "rofi"
 
 # ==============================================================================
-# 5. REFRESH SYSTEM
+# 6. RELOAD
 # ==============================================================================
-step_title "5" "RELOADING DESKTOP"
+step_title "6" "REFRESH"
 
 if pgrep -x "hyprland" > /dev/null; then
-    echo -e "${ICON_INF} Reloading Hyprland..."
     hyprctl reload &>/dev/null
-    
-    echo -e "${ICON_INF} Reloading Waybar..."
     killall waybar &>/dev/null
     waybar &>/dev/null &
-    
-    echo -e "${ICON_OK} Dashboard Refreshed."
-else
-    echo -e "${ICON_INF} Hyprland not running. Skipping reload."
+    echo -e "${ICON_OK} Desktop reloaded."
 fi
 
-echo -e "\n${GREEN}========================================${NC}"
-echo -e "${GREEN}   SYSTEM & CONFIGS UPDATED!            ${NC}"
-echo -e "${GREEN}========================================${NC}"
+echo -e "\n${GREEN}=== UPDATE COMPLETE ===${NC}"

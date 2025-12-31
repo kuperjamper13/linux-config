@@ -27,18 +27,21 @@ tooltip {
 }
 
 /* --- THE BIG BUBBLES (GROUPS) --- */
+/* These hold the modules. We made them transparent so the float looks better, 
+   OR we keep the medium blue if you want them connected. 
+   Based on "separate from top", I will keep the container Blue 
+   but rounded on ALL corners now since it's floating. */
+
 #group-left {
     background-color: #13315c;
-    border-bottom-right-radius: 99px;
-    margin: 0; 
-    padding: 4px 20px 4px 5px; 
+    border-radius: 99px; /* Fully rounded since floating */
+    padding: 4px 15px 4px 5px; 
 }
 
 #group-right {
     background-color: #13315c;
-    border-bottom-left-radius: 99px;
-    margin: 0;
-    padding: 4px 5px 4px 20px;
+    border-radius: 99px; /* Fully rounded since floating */
+    padding: 4px 5px 4px 15px;
 }
 
 /* --- MODULES --- */
@@ -48,25 +51,24 @@ tooltip {
     background-color: transparent;
     color: #8da9c4;
     font-size: 22px;
-    margin-left: 15px;
+    margin-left: 10px;
     margin-right: 15px;
     padding: 0;
 }
 
-/* Desktop Numbers (Workspaces) - CIRCLES */
+/* Desktop Numbers (Workspaces) - PILLS (Not circles) */
 #workspaces {
     background-color: #0b2545;
     border-radius: 99px;
     margin: 0;
-    padding: 5px;
+    padding: 4px 8px; /* Padding inside the dark container */
 }
 
 #workspaces button {
     color: #8da9c4;
-    border-radius: 50%;
-    min-width: 30px;
-    min-height: 30px;
-    padding: 0;
+    border-radius: 99px; /* Pill shape */
+    padding: 0 12px;     /* Wide padding for pill look */
+    margin: 0 2px;
 }
 
 #workspaces button.active {
@@ -81,8 +83,7 @@ tooltip {
 /* Right Modules - PILLS */
 #network,
 #battery,
-#clock.date,
-#clock.time {
+#clock {
     background-color: #0b2545;
     margin: 0 5px;
     padding: 4px 14px;
@@ -94,41 +95,24 @@ tooltip {
     color: #8da9c4;
 }
 
-#battery {
-    color: #eef4ed;
-}
-
 #battery.charging {
     background-color: #134074;
     color: #eef4ed;
 }
 
-/* --- CLOCK SPLIT STYLING --- */
-
-/* Date: Discreet Grey */
-#clock.date {
-    background-color: #0b2545;
-    color: #8da9c4;
-    margin-right: 2px; /* Close to the time */
-    padding-right: 10px;
-}
-
-/* Time: Bold White */
-#clock.time {
-    background-color: #134074; /* Accent Background */
+#clock {
+    background-color: #134074; /* Accent Background for the whole time/date pill */
     color: #eef4ed;
-    font-weight: 900; /* Extra Bold */
-    margin-right: 15px;
-    margin-left: 0px;
+    margin-right: 5px;
 }
 
 
-/* Center Window Title - NO BUBBLE */
+/* Center Window Title */
 #window {
-    background-color: transparent;
-    box-shadow: none;
+    background-color: #13315c; /* Optional: Put it in a bubble too to match? */
+    border-radius: 99px;
+    padding: 2px 20px;
     color: #eef4ed;
-    margin-top: 5px;
+    margin-top: 0px; 
     font-size: 13px;
-    font-weight: bold;
 }

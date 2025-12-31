@@ -5,7 +5,7 @@
     "exclusive": true,
     "passthrough": false,
     "gtk-layer-shell": true,
-    "height": 40,
+    "height": 44,
     "modules-left": ["group/left"],
     "modules-center": ["hyprland/window"],
     "modules-right": ["group/right"],
@@ -49,10 +49,12 @@
     },
 
     "network": {
-        "format-wifi": "",
-        "format-ethernet": "",
-        "format-disconnected": "睊",
-        "tooltip-format": "{ipaddr} / {essid} ({signalStrength}%)"
+        /* Shows IP by default. Shows Signal % when clicked */
+        "format-wifi": "{ipaddr}",
+        "format-ethernet": "{ipaddr}",
+        "format-disconnected": "No IP",
+        "format-alt": "  {signalStrength}%",
+        "tooltip-format": "{essid}"
     },
 
     "battery": {
@@ -68,7 +70,8 @@
     },
 
     "clock": {
-        "format": "{:%a, %d %b  •  %H:%M}",
+        /* Date is Grey (#8da9c4), Time is Bold White (#eef4ed) */
+        "format": "<span color='#8da9c4'>{:%a, %d %b}</span>   <span color='#eef4ed'><b>{:%H:%M}</b></span>",
         "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
     }
 }

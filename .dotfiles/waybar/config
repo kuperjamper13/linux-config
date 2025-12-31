@@ -5,7 +5,7 @@
     "exclusive": true,
     "passthrough": false,
     "gtk-layer-shell": true,
-    "height": 44,
+    "height": 40,
     "modules-left": ["group/left"],
     "modules-center": ["hyprland/window"],
     "modules-right": ["group/right"],
@@ -28,7 +28,7 @@
     },
 
     "custom/arch": {
-        "format": "  ",
+        "format": "",
         "tooltip": false,
         "on-click": "rofi -show drun"
     },
@@ -49,10 +49,10 @@
     },
 
     "network": {
-        "format-wifi": "  {ipaddr}",
-        "format-ethernet": " {ipaddr}",
-        "format-disconnected": "睊 No IP",
-        "tooltip-format": "{essid} ({signalStrength}%)"
+        "format-wifi": "",
+        "format-ethernet": "",
+        "format-disconnected": "睊",
+        "tooltip-format": "{ipaddr} / {essid} ({signalStrength}%)"
     },
 
     "battery": {
@@ -62,13 +62,13 @@
             "critical": 15
         },
         "format": "{icon} {capacity}%",
-        "format-charging": " {capacity}%",
-        "format-plugged": " {capacity}%",
+        "format-charging": " {capacity}%",
+        "format-plugged": " {capacity}%",
         "format-icons": ["", "", "", "", ""]
     },
 
     "clock": {
-        "format": "{:%a, %d %b • %H:%M}",
+        "format": "{:%a, %d %b  •  %H:%M}",
         "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
     }
 }

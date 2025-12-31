@@ -31,7 +31,7 @@ tooltip {
     background-color: #13315c;
     border-bottom-right-radius: 99px;
     margin: 0; 
-    padding: 4px 20px 4px 5px; /* Added extra padding right */
+    padding: 4px 20px 4px 5px; 
 }
 
 #group-right {
@@ -43,13 +43,13 @@ tooltip {
 
 /* --- MODULES --- */
 
-/* Arch Logo - Extra Padding */
+/* Arch Logo */
 #custom-arch {
     background-color: transparent;
     color: #8da9c4;
     font-size: 22px;
-    margin-left: 15px; /* Move away from edge */
-    margin-right: 15px; /* Move away from numbers */
+    margin-left: 15px;
+    margin-right: 15px;
     padding: 0;
 }
 
@@ -63,10 +63,10 @@ tooltip {
 
 #workspaces button {
     color: #8da9c4;
-    border-radius: 50%; /* Perfect Circle */
-    min-width: 30px;    /* Force width */
-    min-height: 30px;   /* Force height */
-    padding: 0;         /* Remove text padding so it centers */
+    border-radius: 50%;
+    min-width: 30px;
+    min-height: 30px;
+    padding: 0;
 }
 
 #workspaces button.active {
@@ -78,13 +78,12 @@ tooltip {
     background-color: #134074;
 }
 
-
 /* Right Modules - PILLS */
 #network,
 #battery,
-#clock {
+#clock.date,
+#clock.time {
     background-color: #0b2545;
-    color: #eef4ed;
     margin: 0 5px;
     padding: 4px 14px;
     border-radius: 99px;
@@ -92,7 +91,11 @@ tooltip {
 }
 
 #network {
-    color: #8da9c4; /* Greyish IP */
+    color: #8da9c4;
+}
+
+#battery {
+    color: #eef4ed;
 }
 
 #battery.charging {
@@ -100,9 +103,23 @@ tooltip {
     color: #eef4ed;
 }
 
-#clock {
-    background-color: #134074;
-    margin-right: 15px; /* Padding from edge */
+/* --- CLOCK SPLIT STYLING --- */
+
+/* Date: Discreet Grey */
+#clock.date {
+    background-color: #0b2545;
+    color: #8da9c4;
+    margin-right: 2px; /* Close to the time */
+    padding-right: 10px;
+}
+
+/* Time: Bold White */
+#clock.time {
+    background-color: #134074; /* Accent Background */
+    color: #eef4ed;
+    font-weight: 900; /* Extra Bold */
+    margin-right: 15px;
+    margin-left: 0px;
 }
 
 

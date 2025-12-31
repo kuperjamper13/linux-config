@@ -6,6 +6,9 @@
     "passthrough": false,
     "gtk-layer-shell": true,
     "height": 44,
+    "margin-top": 10,  
+    "margin-left": 10,
+    "margin-right": 10,
     "modules-left": ["group/left"],
     "modules-center": ["hyprland/window"],
     "modules-right": ["group/right"],
@@ -23,8 +26,7 @@
         "modules": [
             "network",
             "battery",
-            "clock#date",
-            "clock#time"
+            "clock"
         ]
     },
 
@@ -69,13 +71,9 @@
         "format-icons": ["", "", "", "", ""]
     },
 
-    "clock#date": {
-        "format": "{:%a, %d %b}",
-        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
-    },
-
-    "clock#time": {
-        "format": "{:%H:%M}",
+    "clock": {
+        /* Single Bubble: Grey Date + Bold White Time */
+        "format": "<span color='#8da9c4'>{:%a, %d %b}</span>   <span color='#eef4ed'><b>{:%H:%M}</b></span>",
         "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
     }
 }

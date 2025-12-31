@@ -1,0 +1,106 @@
+/* Palette Reference:
+Bg Dark: #0b2545
+Bg Med:  #13315c
+Bg Light: #134074
+Accent:  #8da9c4
+Text:    #eef4ed
+*/
+
+* {
+    border: none;
+    border-radius: 0;
+    font-family: "JetBrainsMono Nerd Font";
+    font-weight: bold;
+    font-size: 14px;
+    min-height: 0;
+}
+
+window#waybar {
+    background: transparent;
+    color: #eef4ed;
+}
+
+tooltip {
+    background: #0b2545;
+    border-radius: 15px;
+    border: 2px solid #134074;
+}
+
+tooltip label {
+    color: #eef4ed;
+}
+
+/* --- MODULE STYLES --- */
+
+/* General module style for the "island" look */
+#workspaces,
+#clock,
+#window,
+#pulseaudio,
+#network,
+#bluetooth,
+#battery {
+    background-color: #13315c;
+    padding: 5px 15px;
+    margin: 6px 4px;
+    border-radius: 15px;
+    color: #eef4ed;
+    box-shadow: 2px 2px 5px 1px rgba(11, 37, 69, 0.5); /* Using darkest blue for shadow */
+}
+
+/* Adjusting left/right margins for ends */
+#clock {
+    margin-left: 15px;
+    background-color: #134074; /* Making clock slightly brighter accent */
+}
+
+#battery {
+    margin-right: 15px;
+}
+
+/* Workspaces specific styling */
+#workspaces button {
+    padding: 0 5px;
+    background-color: transparent;
+    color: #8da9c4;
+    border-radius: 15px;
+}
+
+#workspaces button:hover {
+    background: rgba(19, 64, 116, 0.5);
+    color: #eef4ed;
+}
+
+#workspaces button.active {
+    background-color: #eef4ed;
+    color: #0b2545;
+    padding: 0 10px;
+}
+
+#window {
+    background-color: transparent;
+    box-shadow: none;
+}
+
+/* States */
+#battery.charging, #battery.plugged {
+    color: #0b2545;
+    background-color: #8da9c4;
+}
+
+#battery.critical:not(.charging) {
+    background-color: #ff6b6b;
+    color: #eef4ed;
+    animation-name: blink;
+    animation-duration: 0.5s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+}
+
+@keyframes blink {
+    to {
+        background-color: #13315c;
+        color: #8da9c4;
+    }
+}

@@ -6,11 +6,11 @@
     "passthrough": false,
     "gtk-layer-shell": true,
     "height": 44,
-    "margin-top": 10,  
-    "margin-left": 10,
-    "margin-right": 10,
+    "margin-top": 0,
+    "margin-left": 0,
+    "margin-right": 0,
     "modules-left": ["group/left"],
-    "modules-center": ["hyprland/window"],
+    "modules-center": [],
     "modules-right": ["group/right"],
 
     "group/left": {
@@ -47,10 +47,6 @@
         }
     },
 
-    "hyprland/window": {
-        "format": "{}"
-    },
-
     "network": {
         "format-wifi": "{ipaddr}",
         "format-ethernet": "{ipaddr}",
@@ -72,8 +68,7 @@
     },
 
     "clock": {
-        /* Single Bubble: Grey Date + Bold White Time */
-        "format": "<span color='#8da9c4'>{:%a, %d %b}</span>   <span color='#eef4ed'><b>{:%H:%M}</b></span>",
-        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+        "format": "{:%H:%M}",
+        "tooltip-format": "{:%Y-%m-%d}"
     }
 }

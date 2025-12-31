@@ -1,8 +1,7 @@
 /* PALETTE:
-Darkest: #0b2545 (Inner Bubbles)
-Medium:  #13315c (Big Outer Bubble)
-Accent:  #134074 
+Black:   #000000
 Text:    #eef4ed
+Accent:  #134074
 Grey:    #8da9c4
 */
 
@@ -21,74 +20,68 @@ window#waybar {
 }
 
 tooltip {
-    background: #0b2545;
+    background: #000000;
     border-radius: 10px;
     border: 1px solid #8da9c4;
 }
 
-/* --- THE BIG BUBBLES (GROUPS) --- */
-/* These hold the modules. We made them transparent so the float looks better, 
-   OR we keep the medium blue if you want them connected. 
-   Based on "separate from top", I will keep the container Blue 
-   but rounded on ALL corners now since it's floating. */
+/* --- THE BIG BLACK SECTIONS --- */
 
 #group-left {
-    background-color: #13315c;
-    border-radius: 99px; /* Fully rounded since floating */
-    padding: 4px 15px 4px 5px; 
+    background-color: #000000;
+    /* Round ONLY the bottom-right corner */
+    border-bottom-right-radius: 30px;
+    /* Ensure other corners touching the screen are square */
+    border-top-left-radius: 0px;
+    border-bottom-left-radius: 0px;
+    
+    padding: 5px 20px 5px 10px;
 }
 
 #group-right {
-    background-color: #13315c;
-    border-radius: 99px; /* Fully rounded since floating */
-    padding: 4px 5px 4px 15px;
+    background-color: #000000;
+    /* Round ONLY the bottom-left corner */
+    border-bottom-left-radius: 30px;
+    /* Ensure other corners touching the screen are square */
+    border-top-right-radius: 0px;
+    border-bottom-right-radius: 0px;
+
+    padding: 5px 10px 5px 20px;
 }
 
-/* --- MODULES --- */
+/* --- MODULES INSIDE (Transparent to blend with black) --- */
 
-/* Arch Logo */
-#custom-arch {
+#custom-arch,
+#workspaces,
+#network,
+#battery,
+#clock {
     background-color: transparent;
+    color: #eef4ed;
+    margin: 0 5px;
+    padding: 0 5px;
+    box-shadow: none;
+}
+
+/* Specific text colors */
+
+#custom-arch {
     color: #8da9c4;
     font-size: 22px;
-    margin-left: 10px;
     margin-right: 15px;
-    padding: 0;
-}
-
-/* Desktop Numbers (Workspaces) - PILLS (Not circles) */
-#workspaces {
-    background-color: #0b2545;
-    border-radius: 99px;
-    margin: 0;
-    padding: 4px 8px; /* Padding inside the dark container */
 }
 
 #workspaces button {
     color: #8da9c4;
-    border-radius: 99px; /* Pill shape */
-    padding: 0 12px;     /* Wide padding for pill look */
-    margin: 0 2px;
+    padding: 0 5px;
 }
 
 #workspaces button.active {
-    color: #0b2545;
-    background-color: #eef4ed;
+    color: #eef4ed;
 }
 
 #workspaces button:hover {
-    background-color: #134074;
-}
-
-/* Right Modules - PILLS */
-#network,
-#battery,
-#clock {
-    background-color: #0b2545;
-    margin: 0 5px;
-    padding: 4px 14px;
-    border-radius: 99px;
-    box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+    color: #134074;
 }
 
 #network {
@@ -96,23 +89,11 @@ tooltip {
 }
 
 #battery.charging {
-    background-color: #134074;
-    color: #eef4ed;
+    color: #134074;
 }
 
 #clock {
-    background-color: #134074; /* Accent Background for the whole time/date pill */
     color: #eef4ed;
-    margin-right: 5px;
-}
-
-
-/* Center Window Title */
-#window {
-    background-color: #13315c; /* Optional: Put it in a bubble too to match? */
-    border-radius: 99px;
-    padding: 2px 20px;
-    color: #eef4ed;
-    margin-top: 0px; 
-    font-size: 13px;
+    font-weight: 900;
+    margin-right: 10px;
 }

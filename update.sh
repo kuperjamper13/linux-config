@@ -37,7 +37,7 @@ function step_title {
 }
 
 clear
-echo -e "${MAGENTA}   // SYSTEM UPDATE & DOTFILES SYNC v3.0 //${NC}"
+echo -e "${MAGENTA}   // SYSTEM UPDATE & DOTFILES SYNC v3.1 //${NC}"
 
 # ==============================================================================
 # 1. SYSTEM MAINTENANCE
@@ -135,22 +135,19 @@ link_config "kitty"
 link_config "rofi"
 
 # ==============================================================================
-# 6. LIVE RELOAD (The Fix)
+# 6. LIVE RELOAD
 # ==============================================================================
 step_title "6" "HOT RELOAD & WALLPAPER"
 
 # 1. Reload Hyprland
-# Forces Hyprland to re-read the configuration file
 echo -e "${ICON_INF} Reloading Hyprland Config..."
 hyprctl reload &>/dev/null
 
 # 2. Reload Kitty
-# Sends USR1 signal to all open Kitty instances to refresh colors/fonts instantly
-echo -e "${ICON_INF} Refeshing Kitty Terminals..."
+echo -e "${ICON_INF} Refreshing Kitty Terminals..."
 pkill -USR1 kitty
 
 # 3. Reload Waybar
-# Kill it, WAIT for it to die (crucial for VMs), then start it detached
 echo -e "${ICON_INF} Restarting Waybar..."
 pkill waybar
 sleep 0.5 
@@ -159,33 +156,29 @@ if command -v waybar &> /dev/null; then
     echo -e "${ICON_OK} Waybar restarted."
 fi
 
-# 4. Reload Wallpaper
-# Detects the wallpaper engine and forces an update
+# 4. Reload Wallpaper (SWWW ONLY)
 WALLPAPER_PATH="$DOTFILES_SOURCE/wallpaper.png"
-
 echo -e "${ICON_INF} Applying Wallpaper: $WALLPAPER_PATH"
 
 if [ -f "$WALLPAPER_PATH" ]; then
-    # Try SWWW (Best for animations)
-    if pgrep -x "swww-daemon" > /dev/null; then
-        swww img "$WALLPAPER_PATH" --transition-type grow --transition-pos 0.5,0.5 --transition-fps 60
-        echo -e "${ICON_OK} Updated via swww"
     
-    # Try Hyprpaper (Standard)
-    elif pgrep -x "hyprpaper" > /dev/null; then
-        hyprctl hyprpaper unload all
-        hyprctl hyprpaper preload "$WALLPAPER_PATH"
-        hyprctl hyprpaper wallpaper ",$WALLPAPER_PATH"
-        echo -e "${ICON_OK} Updated via hyprpaper"
-        
-    # Try Swaybg (Fallback)
-    elif pgrep -x "swaybg" > /dev/null; then
-        pkill swaybg
-        swaybg -i "$WALLPAPER_PATH" -m fill & disown
-        echo -e "${ICON_OK} Updated via swaybg"
-    else
-        echo -e "${ICON_ERR} No running wallpaper daemon found (swww/hyprpaper/swaybg)."
+    # Check if swww is installed
+    if ! command -v swww &> /dev/null; then
+        echo -e "${ICON_PKG} swww not found. Installing..."
+        yay -S --noconfirm swww
     fi
+
+    # Check if swww-daemon is running
+    if ! pgrep -x "swww-daemon" > /dev/null; then
+        echo -e "${ICON_INF} swww daemon not running. Starting..."
+        swww init & disown
+        sleep 1 # Wait for daemon to initialize
+    fi
+
+    # Apply wallpaper
+    swww img "$WALLPAPER_PATH" --transition-type grow --transition-pos 0.5,0.5 --transition-fps 60
+    echo -e "${ICON_OK} Wallpaper updated via swww."
+
 else
     echo -e "${ICON_ERR} Wallpaper file not found at $WALLPAPER_PATH"
 fi

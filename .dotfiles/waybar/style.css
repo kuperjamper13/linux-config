@@ -1,9 +1,9 @@
-/* Palette Reference:
-Bg Dark: #0b2545
-Bg Med:  #13315c
-Bg Light: #134074
-Accent:  #8da9c4
+/* PALETTE:
+Darkest: #0b2545 (Inner Bubbles)
+Medium:  #13315c (Big Outer Bubble)
+Accent:  #134074 
 Text:    #eef4ed
+Grey:    #8da9c4
 */
 
 * {
@@ -22,85 +22,86 @@ window#waybar {
 
 tooltip {
     background: #0b2545;
-    border-radius: 15px;
-    border: 2px solid #134074;
+    border-radius: 10px;
+    border: 1px solid #8da9c4;
 }
 
-tooltip label {
-    color: #eef4ed;
-}
+/* --- THE BIG BUBBLES (GROUPS) --- */
+/* These are the containers connected to the sides */
 
-/* --- MODULE STYLES --- */
-
-/* General module style for the "island" look */
-#workspaces,
-#clock,
-#window,
-#pulseaudio,
-#network,
-#bluetooth,
-#battery {
+#group-left {
     background-color: #13315c;
-    padding: 5px 15px;
-    margin: 6px 4px;
-    border-radius: 15px;
-    color: #eef4ed;
-    box-shadow: 2px 2px 5px 1px rgba(11, 37, 69, 0.5); /* Using darkest blue for shadow */
+    border-bottom-right-radius: 20px;
+    border-top-right-radius: 0px; /* Connects to top */
+    border-top-left-radius: 0px;  /* Connects to side */
+    border-bottom-left-radius: 0px; /* Connects to side */
+    margin: 0; 
+    padding: 5px 10px 5px 0px; /* Padding on right to frame the inner bubbles */
 }
 
-/* Adjusting left/right margins for ends */
+#group-right {
+    background-color: #13315c;
+    border-bottom-left-radius: 20px;
+    border-top-left-radius: 0px; /* Connects to top */
+    border-top-right-radius: 0px; /* Connects to side */
+    border-bottom-right-radius: 0px; /* Connects to side */
+    margin: 0;
+    padding: 5px 0px 5px 10px; /* Padding on left to frame inner bubbles */
+}
+
+/* --- THE DARKER BUBBLES (MODULES INSIDE) --- */
+
+#custom-arch,
+#workspaces,
+#network,
+#battery,
 #clock {
-    margin-left: 15px;
-    background-color: #134074; /* Making clock slightly brighter accent */
-}
-
-#battery {
-    margin-right: 15px;
-}
-
-/* Workspaces specific styling */
-#workspaces button {
-    padding: 0 5px;
-    background-color: transparent;
-    color: #8da9c4;
-    border-radius: 15px;
-}
-
-#workspaces button:hover {
-    background: rgba(19, 64, 116, 0.5);
+    background-color: #0b2545; /* Dark Bubble */
     color: #eef4ed;
+    margin: 4px 4px;
+    padding: 4px 12px;
+    border-radius: 12px; /* Fully rounded inner bubbles */
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+}
+
+/* Specific Tweaks */
+
+#custom-arch {
+    font-size: 18px;
+    color: #8da9c4; /* Arch Icon Accent */
+    margin-left: 10px; /* Space from screen edge */
+    padding-left: 14px;
+    padding-right: 18px;
+}
+
+#workspaces button {
+    color: #8da9c4;
 }
 
 #workspaces button.active {
-    background-color: #eef4ed;
-    color: #0b2545;
-    padding: 0 10px;
-}
-
-#window {
-    background-color: transparent;
-    box-shadow: none;
-}
-
-/* States */
-#battery.charging, #battery.plugged {
-    color: #0b2545;
-    background-color: #8da9c4;
-}
-
-#battery.critical:not(.charging) {
-    background-color: #ff6b6b;
     color: #eef4ed;
-    animation-name: blink;
-    animation-duration: 0.5s;
-    animation-timing-function: linear;
-    animation-iteration-count: infinite;
-    animation-direction: alternate;
 }
 
-@keyframes blink {
-    to {
-        background-color: #13315c;
-        color: #8da9c4;
-    }
+#network {
+    color: #8da9c4;
+}
+
+#battery.charging {
+    color: #eef4ed;
+    background-color: #134074;
+}
+
+#clock {
+    margin-right: 10px; /* Space from screen edge */
+    background-color: #134074; /* Make clock stand out slightly */
+    color: #eef4ed;
+}
+
+/* Center Window Title - Floating alone */
+#window {
+    background-color: #13315c;
+    color: #eef4ed;
+    border-radius: 15px;
+    padding: 5px 20px;
+    margin-top: 5px;
 }

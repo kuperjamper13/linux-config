@@ -78,19 +78,17 @@ else
 fi
 
 # ==============================================================================
-# 3. SDDM THEME ENGINE (NEW)
+# 3. SDDM THEME ENGINE
 # ==============================================================================
 step_title "3" "LOGIN SCREEN (SDDM)"
 
 echo -e "${ICON_INF} Installing 'Sugar Dark' theme..."
-# Check if theme is installed, if not, install it via yay
 if ! pacman -Qs sddm-sugar-dark &> /dev/null; then
     yay -S --noconfirm sddm-sugar-dark
 fi
 
 echo -e "${ICON_SUDO} Applying SDDM Configuration..."
 if [ -f "$DOTFILES_SOURCE/sddm/sddm.conf" ]; then
-    # We must COPY this file, not link it, because SDDM runs as root
     sudo cp "$DOTFILES_SOURCE/sddm/sddm.conf" /etc/sddm.conf
     echo -e "${ICON_OK} Configuration applied to /etc/sddm.conf"
 else
@@ -137,15 +135,59 @@ link_config "kitty"
 link_config "rofi"
 
 # ==============================================================================
-# 6. RELOAD
+# 6. LIVE RELOAD (The Fix)
 # ==============================================================================
-step_title "6" "REFRESH"
+step_title "6" "HOT RELOAD & WALLPAPER"
 
-if pgrep -x "hyprland" > /dev/null; then
-    hyprctl reload &>/dev/null
-    killall waybar &>/dev/null
-    waybar &>/dev/null &
-    echo -e "${ICON_OK} Desktop reloaded."
+# 1. Reload Hyprland
+# Forces Hyprland to re-read the configuration file
+echo -e "${ICON_INF} Reloading Hyprland Config..."
+hyprctl reload &>/dev/null
+
+# 2. Reload Kitty
+# Sends USR1 signal to all open Kitty instances to refresh colors/fonts instantly
+echo -e "${ICON_INF} Refeshing Kitty Terminals..."
+pkill -USR1 kitty
+
+# 3. Reload Waybar
+# Kill it, WAIT for it to die (crucial for VMs), then start it detached
+echo -e "${ICON_INF} Restarting Waybar..."
+pkill waybar
+sleep 0.5 
+if command -v waybar &> /dev/null; then
+    waybar > /dev/null 2>&1 & disown
+    echo -e "${ICON_OK} Waybar restarted."
 fi
 
-echo -e "\n${GREEN}=== UPDATE COMPLETE ===${NC}"
+# 4. Reload Wallpaper
+# Detects the wallpaper engine and forces an update
+WALLPAPER_PATH="$DOTFILES_SOURCE/wallpaper.png"
+
+echo -e "${ICON_INF} Applying Wallpaper: $WALLPAPER_PATH"
+
+if [ -f "$WALLPAPER_PATH" ]; then
+    # Try SWWW (Best for animations)
+    if pgrep -x "swww-daemon" > /dev/null; then
+        swww img "$WALLPAPER_PATH" --transition-type grow --transition-pos 0.5,0.5 --transition-fps 60
+        echo -e "${ICON_OK} Updated via swww"
+    
+    # Try Hyprpaper (Standard)
+    elif pgrep -x "hyprpaper" > /dev/null; then
+        hyprctl hyprpaper unload all
+        hyprctl hyprpaper preload "$WALLPAPER_PATH"
+        hyprctl hyprpaper wallpaper ",$WALLPAPER_PATH"
+        echo -e "${ICON_OK} Updated via hyprpaper"
+        
+    # Try Swaybg (Fallback)
+    elif pgrep -x "swaybg" > /dev/null; then
+        pkill swaybg
+        swaybg -i "$WALLPAPER_PATH" -m fill & disown
+        echo -e "${ICON_OK} Updated via swaybg"
+    else
+        echo -e "${ICON_ERR} No running wallpaper daemon found (swww/hyprpaper/swaybg)."
+    fi
+else
+    echo -e "${ICON_ERR} Wallpaper file not found at $WALLPAPER_PATH"
+fi
+
+echo -e "\n${GREEN}=== UPDATE COMPLETE & APPLIED ===${NC}"

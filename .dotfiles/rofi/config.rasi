@@ -1,0 +1,82 @@
+/* Dark Neon Rofi Theme */
+
+configuration {
+    modi: "drun,run";
+    show-icons: true;
+    display-drun: "🚀 Apps";
+    display-run: "💻 Run";
+    font: "JetBrainsMono Nerd Font 12";
+}
+
+* {
+    bg: #11111b;
+    bg-alt: #1e1e2e;
+    fg: #cdd6f4;
+    accent: #89b4fa;
+    active: #313244;
+    
+    background-color: @bg;
+    text-color: @fg;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    spacing: 0;
+}
+
+window {
+    width: 45%;
+    border: 2px;
+    border-color: @accent;
+    border-radius: 10px;
+}
+
+element {
+    padding: 12px;
+    text-color: @fg;
+}
+
+element selected {
+    text-color: @bg;
+    background-color: @accent;
+}
+
+element-text {
+    background-color: inherit;
+    text-color: inherit;
+    vertical-align: 0.5;
+}
+
+element-icon {
+    size: 30;
+    padding: 0 10 0 0;
+    background-color: transparent;
+}
+
+entry {
+    background-color: @bg-alt;
+    padding: 12px;
+    text-color: @fg;
+}
+
+inputbar {
+    children: [prompt, entry];
+    background-color: @bg;
+}
+
+listview {
+    background-color: @bg;
+    columns: 1;
+    lines: 8;
+}
+
+mainbox {
+    background-color: @bg;
+    children: [inputbar, listview];
+}
+
+prompt {
+    background-color: @bg-alt;
+    enabled: true;
+    padding: 12px 0 0 12px;
+    text-color: @accent;
+}

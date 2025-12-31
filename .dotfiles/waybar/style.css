@@ -27,55 +27,50 @@ tooltip {
 }
 
 /* --- THE BIG BUBBLES (GROUPS) --- */
-/* These are the containers connected to the sides */
-
 #group-left {
     background-color: #13315c;
-    border-bottom-right-radius: 20px;
-    border-top-right-radius: 0px; /* Connects to top */
-    border-top-left-radius: 0px;  /* Connects to side */
-    border-bottom-left-radius: 0px; /* Connects to side */
+    border-bottom-right-radius: 99px; /* Max roundness */
     margin: 0; 
-    padding: 5px 10px 5px 0px; /* Padding on right to frame the inner bubbles */
+    padding: 2px 10px 2px 0px;
 }
 
 #group-right {
     background-color: #13315c;
-    border-bottom-left-radius: 20px;
-    border-top-left-radius: 0px; /* Connects to top */
-    border-top-right-radius: 0px; /* Connects to side */
-    border-bottom-right-radius: 0px; /* Connects to side */
+    border-bottom-left-radius: 99px; /* Max roundness */
     margin: 0;
-    padding: 5px 0px 5px 10px; /* Padding on left to frame inner bubbles */
+    padding: 2px 0px 2px 10px;
 }
 
 /* --- THE DARKER BUBBLES (MODULES INSIDE) --- */
 
-#custom-arch,
 #workspaces,
 #network,
 #battery,
 #clock {
-    background-color: #0b2545; /* Dark Bubble */
+    background-color: #0b2545;
     color: #eef4ed;
     margin: 4px 4px;
-    padding: 4px 12px;
-    border-radius: 12px; /* Fully rounded inner bubbles */
+    padding: 2px 12px;     /* Reduced top/bottom padding for "shorter" look */
+    border-radius: 99px;   /* Perfect pill shape */
     box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
 }
 
-/* Specific Tweaks */
+/* --- SPECIFIC TWEAKS --- */
 
 #custom-arch {
-    font-size: 18px;
-    color: #8da9c4; /* Arch Icon Accent */
-    margin-left: 10px; /* Space from screen edge */
-    padding-left: 14px;
-    padding-right: 18px;
+    /* No Background, just the Icon */
+    background-color: transparent;
+    color: #8da9c4;
+    font-size: 20px;
+    margin-left: 10px;
+    margin-right: 5px;
+    padding: 0;
+    box-shadow: none;
 }
 
 #workspaces button {
     color: #8da9c4;
+    padding: 0 4px; /* Tighter spacing */
 }
 
 #workspaces button.active {
@@ -84,6 +79,8 @@ tooltip {
 
 #network {
     color: #8da9c4;
+    font-size: 16px;
+    padding: 2px 10px;
 }
 
 #battery.charging {
@@ -92,16 +89,18 @@ tooltip {
 }
 
 #clock {
-    margin-right: 10px; /* Space from screen edge */
-    background-color: #134074; /* Make clock stand out slightly */
+    margin-right: 10px;
+    background-color: #134074;
     color: #eef4ed;
+    padding: 2px 15px;
 }
 
-/* Center Window Title - Floating alone */
+/* Center Window Title */
 #window {
     background-color: #13315c;
     color: #eef4ed;
-    border-radius: 15px;
-    padding: 5px 20px;
+    border-radius: 99px;
+    padding: 2px 20px;
     margin-top: 5px;
+    font-size: 12px;
 }

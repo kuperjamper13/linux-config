@@ -29,78 +29,89 @@ tooltip {
 /* --- THE BIG BUBBLES (GROUPS) --- */
 #group-left {
     background-color: #13315c;
-    border-bottom-right-radius: 99px; /* Max roundness */
+    border-bottom-right-radius: 99px;
     margin: 0; 
-    padding: 2px 10px 2px 0px;
+    padding: 4px 20px 4px 5px; /* Added extra padding right */
 }
 
 #group-right {
     background-color: #13315c;
-    border-bottom-left-radius: 99px; /* Max roundness */
+    border-bottom-left-radius: 99px;
     margin: 0;
-    padding: 2px 0px 2px 10px;
+    padding: 4px 5px 4px 20px;
 }
 
-/* --- THE DARKER BUBBLES (MODULES INSIDE) --- */
+/* --- MODULES --- */
 
-#workspaces,
+/* Arch Logo - Extra Padding */
+#custom-arch {
+    background-color: transparent;
+    color: #8da9c4;
+    font-size: 22px;
+    margin-left: 15px; /* Move away from edge */
+    margin-right: 15px; /* Move away from numbers */
+    padding: 0;
+}
+
+/* Desktop Numbers (Workspaces) - CIRCLES */
+#workspaces {
+    background-color: #0b2545;
+    border-radius: 99px;
+    margin: 0;
+    padding: 5px;
+}
+
+#workspaces button {
+    color: #8da9c4;
+    border-radius: 50%; /* Perfect Circle */
+    min-width: 30px;    /* Force width */
+    min-height: 30px;   /* Force height */
+    padding: 0;         /* Remove text padding so it centers */
+}
+
+#workspaces button.active {
+    color: #0b2545;
+    background-color: #eef4ed;
+}
+
+#workspaces button:hover {
+    background-color: #134074;
+}
+
+
+/* Right Modules - PILLS */
 #network,
 #battery,
 #clock {
     background-color: #0b2545;
     color: #eef4ed;
-    margin: 4px 4px;
-    padding: 2px 12px;     /* Reduced top/bottom padding for "shorter" look */
-    border-radius: 99px;   /* Perfect pill shape */
+    margin: 0 5px;
+    padding: 4px 14px;
+    border-radius: 99px;
     box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
 }
 
-/* --- SPECIFIC TWEAKS --- */
-
-#custom-arch {
-    /* No Background, just the Icon */
-    background-color: transparent;
-    color: #8da9c4;
-    font-size: 20px;
-    margin-left: 10px;
-    margin-right: 5px;
-    padding: 0;
-    box-shadow: none;
-}
-
-#workspaces button {
-    color: #8da9c4;
-    padding: 0 4px; /* Tighter spacing */
-}
-
-#workspaces button.active {
-    color: #eef4ed;
-}
-
 #network {
-    color: #8da9c4;
-    font-size: 16px;
-    padding: 2px 10px;
+    color: #8da9c4; /* Greyish IP */
 }
 
 #battery.charging {
-    color: #eef4ed;
     background-color: #134074;
+    color: #eef4ed;
 }
 
 #clock {
-    margin-right: 10px;
     background-color: #134074;
-    color: #eef4ed;
-    padding: 2px 15px;
+    margin-right: 15px; /* Padding from edge */
 }
 
-/* Center Window Title */
+
+/* Center Window Title - NO BUBBLE */
 #window {
-    background-color: #13315c;
+    background-color: transparent;
+    box-shadow: none;
     color: #eef4ed;
-    border-radius: 99px;
-    padding: 2px 20px;
     margin-top: 5px;
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: bold;
 }

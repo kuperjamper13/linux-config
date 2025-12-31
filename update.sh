@@ -37,7 +37,7 @@ function step_title {
 }
 
 clear
-echo -e "${MAGENTA}   // SYSTEM UPDATE & DOTFILES SYNC v3.1 //${NC}"
+echo -e "${MAGENTA}   // SYSTEM UPDATE & DOTFILES SYNC v3.2 //${NC}"
 
 # ==============================================================================
 # 1. SYSTEM MAINTENANCE
@@ -156,7 +156,7 @@ if command -v waybar &> /dev/null; then
     echo -e "${ICON_OK} Waybar restarted."
 fi
 
-# 4. Reload Wallpaper (SWWW ONLY)
+# 4. Reload Wallpaper (SWWW FIXED)
 WALLPAPER_PATH="$DOTFILES_SOURCE/wallpaper.png"
 echo -e "${ICON_INF} Applying Wallpaper: $WALLPAPER_PATH"
 
@@ -169,10 +169,11 @@ if [ -f "$WALLPAPER_PATH" ]; then
     fi
 
     # Check if swww-daemon is running
+    # Note: New swww versions use 'swww-daemon', not 'swww init'
     if ! pgrep -x "swww-daemon" > /dev/null; then
         echo -e "${ICON_INF} swww daemon not running. Starting..."
-        swww init & disown
-        sleep 1 # Wait for daemon to initialize
+        swww-daemon > /dev/null 2>&1 & disown
+        sleep 1 # Wait for daemon to initialize socket
     fi
 
     # Apply wallpaper

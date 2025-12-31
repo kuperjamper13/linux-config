@@ -23,7 +23,8 @@
         "modules": [
             "network",
             "battery",
-            "clock"
+            "clock#date",
+            "clock#time"
         ]
     },
 
@@ -49,7 +50,6 @@
     },
 
     "network": {
-        /* Shows IP by default. Shows Signal % when clicked */
         "format-wifi": "{ipaddr}",
         "format-ethernet": "{ipaddr}",
         "format-disconnected": "No IP",
@@ -69,9 +69,13 @@
         "format-icons": ["", "", "", "", ""]
     },
 
-    "clock": {
-        /* Date is Grey (#8da9c4), Time is Bold White (#eef4ed) */
-        "format": "<span color='#8da9c4'>{:%a, %d %b}</span>   <span color='#eef4ed'><b>{:%H:%M}</b></span>",
+    "clock#date": {
+        "format": "{:%a, %d %b}",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+    },
+
+    "clock#time": {
+        "format": "{:%H:%M}",
         "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
     }
 }

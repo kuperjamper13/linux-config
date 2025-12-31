@@ -23,10 +23,11 @@ ICON_ERR="[${RED}!!${NC}]"
 ICON_ASK="[${MAGENTA}??${NC}]"
 ICON_INF="[${CYAN}::${NC}]"
 ICON_GIT="[${YELLOW}GIT${NC}]"
+ICON_PKG="[${BLUE}PKG${NC}]"
 
 # Configuration
 REPO_URL="https://github.com/kuperjamper13/linux-config.git"
-LOCAL_REPO="$HOME/linux-config" # Standardizing folder name to repo name
+LOCAL_REPO="$HOME/linux-config"
 CONFIG_DIR="$HOME/.config"
 
 function draw_line {
@@ -46,21 +47,44 @@ function show_header {
     echo "░  ░  ░      ░       ░   ░ ░    ░   ▒    "
     echo "      ░                          ░  ░    "
     echo -e "${NC}"
-    echo -e "${CYAN}   // DOTFILES SYNC SYSTEM //${NC}"
+    echo -e "${CYAN}   // SYSTEM UPDATE & DOTFILES SYNC //${NC}"
     draw_line
 }
 
 function step_title {
-    echo -e "\n${CYAN}┌──[ STEP $1/4 ] :: $2${NC}"
+    echo -e "\n${CYAN}┌──[ STEP $1/5 ] :: $2${NC}"
     echo -e "${CYAN}└──────────────────────────────────────────${NC}"
 }
 
 show_header
 
 # ==============================================================================
-# 1. GIT SYNC
+# 1. SYSTEM UPDATE (NEW)
 # ==============================================================================
-step_title "1" "SYNCHRONIZING REPO"
+step_title "1" "SYSTEM MAINTENANCE"
+
+echo -e "${ICON_PKG} Updating Arch Official Repositories..."
+sudo pacman -Syu --noconfirm
+
+if [ $? -eq 0 ]; then
+    echo -e "${ICON_OK} Core system updated."
+else
+    echo -e "${ICON_ERR} Pacman failed. Check internet."
+    # We don't exit here, we try to continue
+fi
+
+if command -v yay &> /dev/null; then
+    echo -e "\n${ICON_PKG} Updating AUR (Yay)..."
+    yay -Syu --noconfirm
+    echo -e "${ICON_OK} AUR packages updated."
+else
+    echo -e "${ICON_INF} Yay not found, skipping AUR update."
+fi
+
+# ==============================================================================
+# 2. GIT SYNC
+# ==============================================================================
+step_title "2" "SYNCHRONIZING REPO"
 
 # Check if we need to Clone or Pull
 if [ -d "$LOCAL_REPO" ]; then
@@ -94,9 +118,9 @@ else
 fi
 
 # ==============================================================================
-# 2. KEYMAP INJECTION
+# 3. KEYMAP INJECTION
 # ==============================================================================
-step_title "2" "HARDWARE ADAPTATION"
+step_title "3" "HARDWARE ADAPTATION"
 
 # Detect System Keymap
 DETECTED_KEYMAP=$(grep KEYMAP /etc/vconsole.conf | cut -d= -f2)
@@ -111,23 +135,23 @@ if [ -f "$HYPR_CONF" ]; then
     echo -e "${ICON_INF} Injecting keymap into local config copy..."
     # We use sed to replace standard US layout with the detected one
     sed -i "s/kb_layout = us/kb_layout = $DETECTED_KEYMAP/g" "$HYPR_CONF"
-    sed -i "s/kb_layout = es/kb_layout = $DETECTED_KEYMAP/g" "$HYPR_CONF" # Safety check if source was already es
+    sed -i "s/kb_layout = es/kb_layout = $DETECTED_KEYMAP/g" "$HYPR_CONF" 
     echo -e "${ICON_OK} Keymap applied."
 else
     echo -e "${ICON_ERR} Warning: hyprland.conf not found."
 fi
 
 # ==============================================================================
-# 3. SYMLINK ENGINE
+# 4. SYMLINK ENGINE
 # ==============================================================================
-step_title "3" "UPDATING LINKS"
+step_title "4" "UPDATING LINKS"
 
 mkdir -p "$CONFIG_DIR"
 
 link_config() {
     TARGET=$1
     if [ -d "$DOTFILES_SOURCE/$TARGET" ]; then
-        # Remove old link or folder (backup not needed for update script usually, but safe to force link)
+        # Remove old link or folder (force replace)
         rm -rf "$CONFIG_DIR/$TARGET"
         ln -sf "$DOTFILES_SOURCE/$TARGET" "$CONFIG_DIR/$TARGET"
         echo -e "${ICON_OK} Linked: ${WHITE}$TARGET${NC}"
@@ -143,9 +167,9 @@ link_config "kitty"
 link_config "rofi"
 
 # ==============================================================================
-# 4. REFRESH SYSTEM
+# 5. REFRESH SYSTEM
 # ==============================================================================
-step_title "4" "RELOADING DESKTOP"
+step_title "5" "RELOADING DESKTOP"
 
 if pgrep -x "hyprland" > /dev/null; then
     echo -e "${ICON_INF} Reloading Hyprland..."
@@ -161,5 +185,5 @@ else
 fi
 
 echo -e "\n${GREEN}========================================${NC}"
-echo -e "${GREEN}   UPDATE COMPLETE                      ${NC}"
+echo -e "${GREEN}   SYSTEM & CONFIGS UPDATED!            ${NC}"
 echo -e "${GREEN}========================================${NC}"

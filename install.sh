@@ -41,7 +41,7 @@ function show_header {
     echo "  ░    ▒     ░░   ░ ░          ░  ░░ ░"
     echo "       ░  ░   ░      ░ ░       ░  ░  ░"
     echo -e "${NC}"
-    echo -e "${CYAN}   // AUTOMATED INSTALLATION SYSTEM v3.1 //${NC}"
+    echo -e "${CYAN}   // AUTOMATED INSTALLATION SYSTEM v3.2 (STABLE) //${NC}"
     draw_line
 }
 
@@ -261,11 +261,14 @@ echo -e "${CYAN}:: SYSTEM INSTALLATION IN PROGRESS... ::${NC}"
 echo -e "${ICON_INF} Configuring Parallel Downloads..."
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 
-echo -e "${ICON_INF} Selecting Stable Mirrors..."
-echo -e "${DIM}(Filtering for HTTPS only to prevent download errors)${NC}"
+echo -e "${ICON_INF} Updating Mirrors (Skipping speed test)..."
+# We just enable reflector for metadata, but we rely on AGE (Freshness) not RATE (Speed)
+# This prevents the 'failed to rate rsync' error completely.
 pacman -Sy --noconfirm reflector &>/dev/null
-# FIX: Protocol set to HTTPS only (prevents rsync errors), Age set to 24h (prevents dead mirrors)
-reflector --protocol https --age 24 --latest 10 --sort rate --save /etc/pacman.d/mirrorlist
+
+# FIX: No speed test (--sort age), HTTPS only, 20 mirrors. 
+# Added "|| true" so if this fails, the script continues with default mirrors.
+reflector --protocol https --latest 20 --sort age --save /etc/pacman.d/mirrorlist || echo -e "${ICON_ERR} Reflector failed. Using default mirrors."
 # --- OPTIMIZATION END ---
 
 # Format
@@ -359,4 +362,3 @@ echo -e "${GREEN}   INSTALLATION COMPLETE!               ${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo -e "1. Reboot."
 echo -e "2. Log in as ${BOLD}$MY_USER${NC}."
-echo -e "3. Install Hyprland & Rice."

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# 💎 AESTHETIC CONFIGURATION (NEON TERMINAL THEME)
+#  AESTHETIC CONFIGURATION (CYBERPUNK TERMINAL THEME)
 # ==============================================================================
 # Reset
 NC='\033[0m'
@@ -17,11 +17,11 @@ RED='\033[1;31m'
 WHITE='\033[1;37m'
 DIM='\033[2m'
 
-# Icons
-ICON_OK="[${GREEN}OK${NC}]"
-ICON_ERR="[${RED}!!${NC}]"
-ICON_ASK="[${MAGENTA}??${NC}]"
-ICON_INF="[${CYAN}::${NC}]"
+# Text Icons (Strictly ASCII)
+ICON_OK="[${GREEN} OK ${NC}]"
+ICON_ERR="[${RED}FAIL${NC}]"
+ICON_ASK="[${MAGENTA} ?? ${NC}]"
+ICON_INF="[${CYAN} :: ${NC}]"
 
 # UI Helpers
 function draw_line {
@@ -31,18 +31,17 @@ function draw_line {
 function show_header {
     clear
     echo -e "${MAGENTA}"
-    # Corrected ANSI Shadow font for 'ARCH'
-    echo " ▄▄▄       ██▀███   ▄████▄   ██░ ██ "
-    echo "▒████▄    ▓██ ▒ ██▒▒██▀ ▀█  ▓██░ ██▒"
-    echo "▒██  ▀█▄  ▓██ ░▄█ ▒▒▓█    ▄ ▒██▀▀██░"
-    echo "░██▄▄▄▄██ ▒██▀▀█▄  ▒▓▓▄ ▄██ ░▓█ ░██ "
-    echo " ▓█   ▓██▒░██▓ ▒██▒▒ ▓███▀ ░░▓█▒░██▓"
-    echo " ▒▒   ▓▒█░░ ▒▓ ░▒▓░░ ░▒ ▒  ░ ▒ ░░▒░▒"
-    echo "  ▒   ▒▒ ░  ░▒ ░ ▒░  ░  ▒    ▒ ░▒░ ░"
-    echo "  ░   ▒     ░░   ░ ░         ░  ░░ ░"
-    echo "      ░  ░   ░     ░ ░       ░  ░  ░"
+    echo " ▄▄▄        ██▀███    ▄████▄    ██░ ██ "
+    echo "▒████▄     ▓██ ▒ ██▒▒██▀ ▀█   ▓██░ ██▒"
+    echo "▒██  ▀█▄   ▓██ ░▄█ ▒▒▓█    ▄  ▒██▀▀██░"
+    echo "░██▄▄▄▄██  ▒██▀▀█▄   ▒▓▓▄ ▄██ ░▓█ ░██ "
+    echo " ▓█    ▓██▒░██▓ ▒██▒▒ ▓███▀ ░░▓█▒░██▓"
+    echo " ▒▒    ▓▒█░░ ▒▓ ░▒▓░░ ░▒ ▒  ░ ▒ ░░▒░▒"
+    echo "  ▒    ▒▒ ░  ░▒ ░ ▒░  ░  ▒     ▒ ░▒░ ░"
+    echo "  ░    ▒     ░░   ░ ░          ░  ░░ ░"
+    echo "       ░  ░   ░      ░ ░       ░  ░  ░"
     echo -e "${NC}"
-    echo -e "${CYAN}   // AUTOMATED INSTALLATION SYSTEM v2.2 //${NC}"
+    echo -e "${CYAN}   // AUTOMATED INSTALLATION SYSTEM v3.0 //${NC}"
     draw_line
 }
 
@@ -221,7 +220,6 @@ if [ "$PART_MODE" == "2" ]; then
     echo -e "${RED}   DANGER: WIPING $TARGET_DISK          ${NC}"
     echo -e "${RED}========================================${NC}"
     echo ""
-    # Added new line above this prompt as requested
     read -p "$(echo -e "${ICON_ASK} Type 'DESTROY' to confirm: ${NC}")" CONFIRM
     if [ "$CONFIRM" != "DESTROY" ]; then echo "Aborted."; exit 1; fi
 
@@ -259,6 +257,16 @@ fi
 show_header
 echo -e "${CYAN}:: SYSTEM INSTALLATION IN PROGRESS... ::${NC}"
 
+# --- OPTIMIZATION START ---
+echo -e "${ICON_INF} Configuring Parallel Downloads..."
+sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
+
+echo -e "${ICON_INF} Optimizing Mirrors for Speed..."
+echo -e "${DIM}(This uses 'reflector' temporarily in the live environment)${NC}"
+pacman -Sy --noconfirm reflector &>/dev/null
+reflector --latest 10 --sort rate --save /etc/pacman.d/mirrorlist
+# --- OPTIMIZATION END ---
+
 # Format
 echo -e "${ICON_INF} Formatting Root..."
 mkfs.ext4 -F $ROOT_PART &>/dev/null
@@ -273,9 +281,22 @@ mount $ROOT_PART /mnt
 mkdir -p /mnt/boot
 mount $EFI_PART /mnt/boot
 
+# CPU Detection
+echo -e "${ICON_INF} Detecting CPU Vendor..."
+if grep -q "AuthenticAMD" /proc/cpuinfo; then
+    MICROCODE="amd-ucode"
+    echo -e "${ICON_OK} AMD CPU detected. Queuing ${BOLD}amd-ucode${NC}."
+else
+    MICROCODE="intel-ucode"
+    echo -e "${ICON_OK} Intel CPU detected. Queuing ${BOLD}intel-ucode${NC}."
+fi
+
 # Install
-echo -e "${ICON_INF} Downloading Packages (This takes time)..."
-pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel clang git networkmanager nano intel-ucode &>/dev/null
+echo -e "${ICON_INF} Downloading Packages (Fast Mode)..."
+# Included: base system, zen kernel (speed), firmware, microcode, network, 
+# mesa (graphics backend), pipewire (modern audio), power-profiles (battery)
+pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel clang git networkmanager nano \
+    $MICROCODE mesa pipewire pipewire-alsa pipewire-pulse wireplumber power-profiles-daemon &>/dev/null
 
 echo -e "${ICON_INF} Generating Filesystem Table..."
 genfstab -U /mnt >> /mnt/etc/fstab
@@ -292,6 +313,7 @@ export TIMEZONE LOCALE KEYMAP MY_HOSTNAME MY_USER MY_PASS
 
 echo -e "${ICON_INF} Configuring System Internals..."
 arch-chroot /mnt /bin/bash <<EOF
+# 1. Time & Locales
 ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
 hwclock --systohc
 echo "$LOCALE UTF-8" > /etc/locale.gen
@@ -300,17 +322,32 @@ echo "LANG=$LOCALE" > /etc/locale.conf
 echo "KEYMAP=$KEYMAP" > /etc/vconsole.conf
 echo "$MY_HOSTNAME" > /etc/hostname
 
+# 2. Users & Passwords
 echo "root:$MY_PASS" | chpasswd
 useradd -m -G wheel,storage,power -s /bin/bash $MY_USER
 echo "$MY_USER:$MY_PASS" | chpasswd
 echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
 
+# 3. Bootloader
 pacman -S --noconfirm grub efibootmgr os-prober > /dev/null
 echo "GRUB_DISABLE_OS_PROBER=false" >> /etc/default/grub
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=Arch > /dev/null
 grub-mkconfig -o /boot/grub/grub.cfg > /dev/null
 
+# 4. Services
 systemctl enable NetworkManager
+systemctl enable power-profiles-daemon
+
+# 5. Swap File (4GB - Prevents crashes)
+echo "Creating Swapfile..."
+dd if=/dev/zero of=/swapfile bs=1G count=4 status=none
+chmod 600 /swapfile
+mkswap /swapfile > /dev/null
+swapon /swapfile
+echo "/swapfile none swap defaults 0 0" >> /etc/fstab
+
+# 6. Quality of Life
+sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 echo "set tabsize 4" > /home/$MY_USER/.nanorc
 echo "set tabstospaces" >> /home/$MY_USER/.nanorc
 chown $MY_USER:$MY_USER /home/$MY_USER/.nanorc
@@ -321,4 +358,3 @@ echo -e "${GREEN}   INSTALLATION COMPLETE!               ${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo -e "1. Reboot."
 echo -e "2. Log in as ${BOLD}$MY_USER${NC}."
-echo -e "3. Run post_install.sh"

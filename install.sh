@@ -41,7 +41,7 @@ function show_header {
     echo "  ░    ▒     ░░   ░ ░          ░  ░░ ░"
     echo "       ░  ░   ░      ░ ░       ░  ░  ░"
     echo -e "${NC}"
-    echo -e "${CYAN}   // ARCH LINUX INSTALLER v4.2 (AUTOMATED) //${NC}"
+    echo -e "${CYAN}   // ARCH LINUX INSTALLER v4.3 (STABLE) //${NC}"
     draw_line
 }
 
@@ -253,17 +253,17 @@ elif [ "$STRATEGY" == "1" ]; then
     # --- USE FREE SPACE ---
     echo -e "${ICON_INF} Detecting Free Space..."
     # Create partition in largest free space block
-    # -n 0:0:0 means "New part, default number, default start, default end (fill gap)"
     sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Linux Root" $TARGET_DISK
     partprobe $TARGET_DISK
+    sync
     sleep 2
     
-    # Detect the partition we just created (It will be the one with label 'Arch Linux Root')
-    # If label fails, we ask user to identify the new partition
-    ROOT_PART=$(lsblk -n -o NAME,PARTLABEL,PATH $TARGET_DISK | grep "Arch Linux Root" | tail -n1 | awk '{print $3}')
+    # FIX: Extract PATH (Column 1) instead of Label Name (Column 2/3)
+    # This prevents the "Root: Linux" error when spaces exist in the label
+    ROOT_PART=$(lsblk -n -o PATH,PARTLABEL $TARGET_DISK | grep "Arch Linux Root" | tail -n1 | awk '{print $1}')
     
     if [[ -z "$ROOT_PART" ]]; then
-        echo -e "${ICON_ERR} Could not auto-detect new partition. Please select it:"
+        echo -e "${ICON_ERR} Could not auto-detect new partition. Please select it manually:"
         lsblk $TARGET_DISK -o NAME,SIZE,TYPE,LABEL
         read -p "Enter Partition Name (e.g. nvme0n1p3): " ROOT_INPUT
         ROOT_PART="/dev/${ROOT_INPUT#/dev/}"
@@ -284,6 +284,7 @@ else
     # --- MANUAL MODE ---
     cfdisk $TARGET_DISK
     partprobe $TARGET_DISK
+    sleep 2
     # Fallback to manual input loop
     echo -e "\n${CYAN}:: Identify Partitions ::${NC}"
     lsblk $TARGET_DISK -o NAME,SIZE,TYPE,FSTYPE,LABEL
@@ -299,7 +300,7 @@ fi
 # 4. FINAL VERIFICATION LOOP
 # Verify partitions actually exist before proceeding
 if [ ! -b "$ROOT_PART" ] || [ ! -b "$EFI_PART" ]; then
-    echo -e "\n${ICON_ERR} CRITICAL ERROR: Defined partitions do not exist."
+    echo -e "\n${ICON_ERR} CRITICAL ERROR: Defined partition does not exist."
     echo -e "Root: $ROOT_PART"
     echo -e "EFI:  $EFI_PART"
     echo -e "Script cannot proceed. Please restart and check your disk."

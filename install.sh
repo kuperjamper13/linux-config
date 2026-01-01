@@ -41,7 +41,7 @@ function show_header {
     echo "  ░    ▒     ░░   ░ ░          ░  ░░ ░"
     echo "       ░  ░   ░      ░ ░       ░  ░  ░"
     echo -e "${NC}"
-    echo -e "${CYAN}   // AUTOMATED INSTALLATION SYSTEM v3.2 (STABLE) //${NC}"
+    echo -e "${CYAN}   // AUTOMATED INSTALLATION SYSTEM v3.3 (FINAL) //${NC}"
     draw_line
 }
 
@@ -260,15 +260,6 @@ echo -e "${CYAN}:: SYSTEM INSTALLATION IN PROGRESS... ::${NC}"
 # --- OPTIMIZATION START ---
 echo -e "${ICON_INF} Configuring Parallel Downloads..."
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
-
-echo -e "${ICON_INF} Updating Mirrors (Skipping speed test)..."
-# We just enable reflector for metadata, but we rely on AGE (Freshness) not RATE (Speed)
-# This prevents the 'failed to rate rsync' error completely.
-pacman -Sy --noconfirm reflector &>/dev/null
-
-# FIX: No speed test (--sort age), HTTPS only, 20 mirrors. 
-# Added "|| true" so if this fails, the script continues with default mirrors.
-reflector --protocol https --latest 20 --sort age --save /etc/pacman.d/mirrorlist || echo -e "${ICON_ERR} Reflector failed. Using default mirrors."
 # --- OPTIMIZATION END ---
 
 # Format
@@ -310,8 +301,24 @@ genfstab -U /mnt >> /mnt/etc/fstab
 # ==============================================================================
 echo -e "\n${CYAN}:: USER ACCOUNTS ::${NC}"
 read -p "$(echo -e "${ICON_ASK} New Username: ${NC}")" MY_USER
-read -s -p "$(echo -e "${ICON_ASK} New Password: ${NC}")" MY_PASS
-echo ""
+
+# --- PASSWORD LOOP START ---
+while true; do
+    echo -e "${CYAN}:: Set Password for $MY_USER ::${NC}"
+    read -s -p "$(echo -e "${ICON_ASK} Enter Password: ${NC}")" PASS1
+    echo
+    read -s -p "$(echo -e "${ICON_ASK} Confirm Password: ${NC}")" PASS2
+    echo ""
+    
+    if [ "$PASS1" == "$PASS2" ] && [ ! -z "$PASS1" ]; then
+        MY_PASS="$PASS1"
+        echo -e "${ICON_OK} Password matched."
+        break
+    else
+        echo -e "${ICON_ERR} Passwords do not match or are empty. Try again."
+    fi
+done
+# --- PASSWORD LOOP END ---
 
 export TIMEZONE LOCALE KEYMAP MY_HOSTNAME MY_USER MY_PASS
 

@@ -41,7 +41,7 @@ function show_header {
     echo "  ░    ▒     ░░   ░ ░          ░  ░░ ░"
     echo "       ░  ░   ░      ░ ░       ░  ░  ░"
     echo -e "${NC}"
-    echo -e "${CYAN}   // AUTOMATED INSTALLATION SYSTEM v3.3 (FINAL) //${NC}"
+    echo -e "${CYAN}   // AUTOMATED INSTALLATION SYSTEM v3.4 (FINAL) //${NC}"
     draw_line
 }
 
@@ -173,23 +173,30 @@ else
     echo -e "${ICON_INF} Scanning on ${BOLD}$WIFI_INTERFACE${NC}..."
     iwctl station $WIFI_INTERFACE scan
     iwctl station $WIFI_INTERFACE get-networks
-    
     echo ""
-    read -p "$(echo -e "${ICON_ASK} WiFi Name (SSID): ${NC}")" WIFI_SSID
-    read -s -p "$(echo -e "${ICON_ASK} WiFi Password: ${NC}")" WIFI_PASS
-    echo ""
-    
-    echo -e "${ICON_INF} Connecting..."
-    iwctl --passphrase "$WIFI_PASS" station $WIFI_INTERFACE connect "$WIFI_SSID"
-    sleep 5
-    
-    if ping -c 1 google.com &> /dev/null; then
-        echo -e "${ICON_OK} ${GREEN}Connected Successfully.${NC}"
-    else
-        echo -e "${ICON_ERR} ${RED}Connection Failed.${NC}"
-        echo "Check password or try manual connection."
-        read -p "Press Enter to continue anyway..."
-    fi
+
+    # Loop until connected
+    while true; do
+        echo -e "${CYAN}:: Enter WiFi Credentials ::${NC}"
+        read -p "$(echo -e "${ICON_ASK} WiFi Name (SSID): ${NC}")" WIFI_SSID
+        read -s -p "$(echo -e "${ICON_ASK} WiFi Password: ${NC}")" WIFI_PASS
+        echo ""
+        
+        echo -e "${ICON_INF} Attempting connection to ${BOLD}$WIFI_SSID${NC}..."
+        iwctl --passphrase "$WIFI_PASS" station $WIFI_INTERFACE connect "$WIFI_SSID"
+        
+        # Wait a bit longer for DHCP negotiation
+        echo -e "${ICON_INF} Verifying connection (Waiting 8s)..."
+        sleep 8
+        
+        if ping -c 1 google.com &> /dev/null; then
+            echo -e "${ICON_OK} ${GREEN}Connected Successfully.${NC}"
+            break
+        else
+            echo -e "${ICON_ERR} ${RED}Connection Failed or Wrong Password.${NC}"
+            echo -e "${DIM}Please try again...${NC}\n"
+        fi
+    done
 fi
 
 # ==============================================================================

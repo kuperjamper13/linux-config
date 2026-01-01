@@ -41,7 +41,7 @@ function show_header {
     echo "  ░    ▒     ░░   ░ ░          ░  ░░ ░"
     echo "       ░  ░   ░      ░ ░       ░  ░  ░"
     echo -e "${NC}"
-    echo -e "${CYAN}   // ARCH LINUX INSTALLER v4.1 (STABLE) //${NC}"
+    echo -e "${CYAN}   // ARCH LINUX INSTALLER v4.2 (AUTOMATED) //${NC}"
     draw_line
 }
 
@@ -191,21 +191,18 @@ else
 fi
 
 # ==============================================================================
-# 6. DISK CONFIGURATION (UNIVERSAL)
+# 6. DISK CONFIGURATION (AUTOMATED)
 # ==============================================================================
 show_header
 step_title "6" "DISK PARTITIONING"
 
-# 1. DISK SELECTION & SANITIZATION
+# 1. DISK SELECTION
 echo -e "${CYAN}:: Available Storage ::${NC}"
 lsblk -d -n -o NAME,SIZE,MODEL,TYPE | grep 'disk' | awk '{print " /dev/" $1 " (" $2 ") - " $3}'
 echo ""
 
-# FIX: Input Sanitization Loop
 while true; do
     read -p "$(echo -e "${ICON_ASK} Enter Target Drive (e.g. nvme0n1 or /dev/vda): ${NC}")" DISK_INPUT
-    
-    # Strip '/dev/' if the user typed it, then add it back cleanly
     CLEAN_NAME=${DISK_INPUT#/dev/}
     TARGET_DISK="/dev/$CLEAN_NAME"
 
@@ -217,86 +214,104 @@ while true; do
     fi
 done
 
-# 2. HARDWARE ANALYSIS
-echo -e "\n${CYAN}:: System Analysis ::${NC}"
-TOTAL_RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
-TOTAL_RAM_GB=$(($TOTAL_RAM_KB / 1024 / 1024))
+# 2. STRATEGY SELECTION
+echo -e "\n${CYAN}:: Partitioning Strategy ::${NC}"
+echo -e "${BOLD}[1] Use Free Space (Dual Boot / Safe)${NC}"
+echo -e "    Autofills empty space. Preserves Windows/Data."
+echo -e "${BOLD}[2] Erase Whole Disk (Clean Install)${NC}"
+echo -e "    Deletes EVERYTHING. Creates new structure."
+echo -e "${BOLD}[3] Manual Mode (Advanced)${NC}"
+echo -e "    Open partition editor."
 
-echo -e " [RAM]  Detected ${BOLD}${TOTAL_RAM_GB}GB${NC}."
-if [ $TOTAL_RAM_GB -ge 8 ]; then
-    echo -e "        ${GREEN}Advice:${NC} Swap partition not required. Will use Swapfile."
-else
-    echo -e "        ${YELLOW}Advice:${NC} Low RAM. Will create optimized Swapfile."
-fi
+read -p "$(echo -e "\n${ICON_ASK} Select Option [1-3]: ${NC}")" STRATEGY
 
-echo -e " [DISK] Target ${BOLD}$TARGET_DISK${NC}."
-echo -e "        ${GREEN}Advice:${NC} Create 1 partition for Arch (Min 25GB)."
-echo -e "        Leave existing Windows/Data partitions untouched."
-
-# 3. PARTITION MANAGER
-echo -e "\n${CYAN}:: Partition Manager (cfdisk) ::${NC}"
-echo -e "${DIM}Instructions:"
-echo -e "1. Highlight 'Free Space' > Select [ New ]."
-echo -e "2. Select [ Type ] > 'Linux filesystem'."
-echo -e "3. Select [ Write ] > Type 'yes'."
-echo -e "4. Select [ Quit ].${NC}"
-read -p "Press Enter to launch..."
-cfdisk $TARGET_DISK
-partprobe $TARGET_DISK
-sleep 2
-
-# 4. BOOT PARTITION (EFI)
-echo -e "\n${CYAN}:: Boot Configuration (EFI) ::${NC}"
-# Smart Detect
-AUTO_EFI=$(fdisk -l $TARGET_DISK | grep 'EFI System' | awk '{print $1}' | head -n 1)
-
-if [[ -n "$AUTO_EFI" ]]; then
-    echo -e "${ICON_OK} Detected Windows Boot Manager: ${BOLD}$AUTO_EFI${NC}"
-    read -p "$(echo -e "${ICON_ASK} Use this for Boot? (Safe/Dual-Boot) [Y/n]: ${NC}")" USE_AUTO
-    if [[ "$USE_AUTO" =~ ^[Nn]$ ]]; then
-        AUTO_EFI="" 
+# 3. APPLY STRATEGY
+if [ "$STRATEGY" == "2" ]; then
+    # --- ERASE ALL ---
+    echo -e "\n${RED}WARNING: ALL DATA ON $TARGET_DISK WILL BE DESTROYED.${NC}"
+    read -p "$(echo -e "${ICON_ASK} Type 'DESTROY' to confirm: ${NC}")" CONFIRM
+    if [ "$CONFIRM" != "DESTROY" ]; then echo "Aborted."; exit 1; fi
+    
+    echo -e "${ICON_INF} Wiping Disk..."
+    sgdisk -Z $TARGET_DISK &>/dev/null
+    
+    echo -e "${ICON_INF} Creating Partitions..."
+    sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI System Partition" $TARGET_DISK &>/dev/null
+    sgdisk -n 2:0:0     -t 2:8304 -c 2:"Arch Linux Root"      $TARGET_DISK &>/dev/null
+    partprobe $TARGET_DISK
+    sleep 2
+    
+    # Auto-assign variables
+    if [[ "$TARGET_DISK" == *"nvme"* ]]; then
+        EFI_PART="${TARGET_DISK}p1"; ROOT_PART="${TARGET_DISK}p2"
     else
-        EFI_PART=$AUTO_EFI
-        FORMAT_EFI="no" # PROTECT WINDOWS
+        EFI_PART="${TARGET_DISK}1"; ROOT_PART="${TARGET_DISK}2"
     fi
+    FORMAT_EFI="yes"
+
+elif [ "$STRATEGY" == "1" ]; then
+    # --- USE FREE SPACE ---
+    echo -e "${ICON_INF} Detecting Free Space..."
+    # Create partition in largest free space block
+    # -n 0:0:0 means "New part, default number, default start, default end (fill gap)"
+    sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Linux Root" $TARGET_DISK
+    partprobe $TARGET_DISK
+    sleep 2
+    
+    # Detect the partition we just created (It will be the one with label 'Arch Linux Root')
+    # If label fails, we ask user to identify the new partition
+    ROOT_PART=$(lsblk -n -o NAME,PARTLABEL,PATH $TARGET_DISK | grep "Arch Linux Root" | tail -n1 | awk '{print $3}')
+    
+    if [[ -z "$ROOT_PART" ]]; then
+        echo -e "${ICON_ERR} Could not auto-detect new partition. Please select it:"
+        lsblk $TARGET_DISK -o NAME,SIZE,TYPE,LABEL
+        read -p "Enter Partition Name (e.g. nvme0n1p3): " ROOT_INPUT
+        ROOT_PART="/dev/${ROOT_INPUT#/dev/}"
+    fi
+    
+    # Auto-Detect EFI
+    AUTO_EFI=$(fdisk -l $TARGET_DISK | grep 'EFI System' | awk '{print $1}' | head -n 1)
+    if [[ -n "$AUTO_EFI" ]]; then
+        EFI_PART=$AUTO_EFI
+        FORMAT_EFI="no"
+        echo -e "${ICON_OK} Auto-selected EFI: ${BOLD}$EFI_PART${NC}"
+    else
+        echo -e "${ICON_ERR} No EFI partition found. You need an EFI partition to boot."
+        exit 1
+    fi
+
+else
+    # --- MANUAL MODE ---
+    cfdisk $TARGET_DISK
+    partprobe $TARGET_DISK
+    # Fallback to manual input loop
+    echo -e "\n${CYAN}:: Identify Partitions ::${NC}"
+    lsblk $TARGET_DISK -o NAME,SIZE,TYPE,FSTYPE,LABEL
+    
+    read -p "$(echo -e "${ICON_ASK} Select EFI Partition: ${NC}")" EFI_INPUT
+    EFI_PART="/dev/${EFI_INPUT#/dev/}"
+    read -p "$(echo -e "${ICON_ASK} Format EFI? (yes/no): ${NC}")" FORMAT_EFI
+    
+    read -p "$(echo -e "${ICON_ASK} Select Root Partition: ${NC}")" ROOT_INPUT
+    ROOT_PART="/dev/${ROOT_INPUT#/dev/}"
 fi
 
-if [[ -z "$EFI_PART" ]]; then
-    # Manual Select
-    lsblk $TARGET_DISK -o NAME,SIZE,TYPE,FSTYPE,LABEL | grep 'part'
-    read -p "$(echo -e "${ICON_ASK} Select EFI Partition (e.g. ${CLEAN_NAME}p1): ${NC}")" EFI_INPUT
-    # Sanitize input again just in case
-    EFI_CLEAN=${EFI_INPUT#/dev/}
-    EFI_PART="/dev/$EFI_CLEAN"
-    FORMAT_EFI="yes" 
+# 4. FINAL VERIFICATION LOOP
+# Verify partitions actually exist before proceeding
+if [ ! -b "$ROOT_PART" ] || [ ! -b "$EFI_PART" ]; then
+    echo -e "\n${ICON_ERR} CRITICAL ERROR: Defined partitions do not exist."
+    echo -e "Root: $ROOT_PART"
+    echo -e "EFI:  $EFI_PART"
+    echo -e "Script cannot proceed. Please restart and check your disk."
+    exit 1
 fi
 
-# 5. ROOT PARTITION
-echo -e "\n${CYAN}:: Root Partition (System) ::${NC}"
-lsblk $TARGET_DISK -o NAME,SIZE,TYPE,FSTYPE,LABEL | grep 'part' | grep -v "$(basename $EFI_PART)"
-read -p "$(echo -e "${ICON_ASK} Select Root Partition (e.g. ${CLEAN_NAME}p3): ${NC}")" ROOT_INPUT
-ROOT_CLEAN=${ROOT_INPUT#/dev/}
-ROOT_PART="/dev/$ROOT_CLEAN"
-
-# 6. HOME PARTITION (OPTIONAL)
-echo -e "\n${CYAN}:: Home Partition (Optional) ::${NC}"
-read -p "$(echo -e "${ICON_ASK} Separate Home partition? [y/N]: ${NC}")" HAS_HOME
-if [[ "$HAS_HOME" =~ ^[Yy]$ ]]; then
-    read -p "$(echo -e "${ICON_ASK} Select Home Partition: ${NC}")" HOME_INPUT
-    HOME_CLEAN=${HOME_INPUT#/dev/}
-    HOME_PART="/dev/$HOME_CLEAN"
-fi
-
-# 7. CONFIRMATION
 echo -e "\n${RED}========================================${NC}"
 echo -e "${RED}   CONFIRM INSTALLATION TARGETS         ${NC}"
 echo -e "${RED}========================================${NC}"
 echo -e "Disk: ${BOLD}$TARGET_DISK${NC}"
 echo -e "EFI:  ${GREEN}$EFI_PART${NC} (Format: $FORMAT_EFI)"
 echo -e "Root: ${RED}$ROOT_PART${NC} (Format: YES - WIPE)"
-if [[ -n "$HOME_PART" ]]; then
-    echo -e "Home: ${BLUE}$HOME_PART${NC} (Format: NO - KEEP DATA)"
-fi
 echo ""
 read -p "$(echo -e "${ICON_ASK} Type 'yes' to Install: ${NC}")" CONFIRM
 if [ "$CONFIRM" != "yes" ]; then echo "Aborted."; exit 1; fi
@@ -327,11 +342,6 @@ echo -e "${ICON_INF} Mounting..."
 mount $ROOT_PART /mnt
 mkdir -p /mnt/boot
 mount $EFI_PART /mnt/boot
-
-if [[ -n "$HOME_PART" ]]; then
-    mkdir -p /mnt/home
-    mount $HOME_PART /mnt/home
-fi
 
 # CPU Microcode
 echo -e "${ICON_INF} Detecting CPU..."

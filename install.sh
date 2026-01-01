@@ -41,7 +41,7 @@ function show_header {
     echo "  ░    ▒     ░░   ░ ░          ░  ░░ ░"
     echo "       ░  ░   ░      ░ ░       ░  ░  ░"
     echo -e "${NC}"
-    echo -e "${CYAN}   // AUTOMATED INSTALLATION SYSTEM v3.0 //${NC}"
+    echo -e "${CYAN}   // AUTOMATED INSTALLATION SYSTEM v3.1 //${NC}"
     draw_line
 }
 
@@ -261,10 +261,11 @@ echo -e "${CYAN}:: SYSTEM INSTALLATION IN PROGRESS... ::${NC}"
 echo -e "${ICON_INF} Configuring Parallel Downloads..."
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 
-echo -e "${ICON_INF} Optimizing Mirrors for Speed..."
-echo -e "${DIM}(This uses 'reflector' temporarily in the live environment)${NC}"
+echo -e "${ICON_INF} Selecting Stable Mirrors..."
+echo -e "${DIM}(Filtering for HTTPS only to prevent download errors)${NC}"
 pacman -Sy --noconfirm reflector &>/dev/null
-reflector --latest 10 --sort rate --save /etc/pacman.d/mirrorlist
+# FIX: Protocol set to HTTPS only (prevents rsync errors), Age set to 24h (prevents dead mirrors)
+reflector --protocol https --age 24 --latest 10 --sort rate --save /etc/pacman.d/mirrorlist
 # --- OPTIMIZATION END ---
 
 # Format
@@ -292,7 +293,7 @@ else
 fi
 
 # Install
-echo -e "${ICON_INF} Downloading Packages (Fast Mode)..."
+echo -e "${ICON_INF} Downloading Packages..."
 # Included: base system, zen kernel (speed), firmware, microcode, network, 
 # mesa (graphics backend), pipewire (modern audio), power-profiles (battery)
 pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel clang git networkmanager nano \
@@ -358,3 +359,4 @@ echo -e "${GREEN}   INSTALLATION COMPLETE!               ${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo -e "1. Reboot."
 echo -e "2. Log in as ${BOLD}$MY_USER${NC}."
+echo -e "3. Install Hyprland & Rice."

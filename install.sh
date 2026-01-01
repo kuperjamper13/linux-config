@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH CONFIGURATION AND INSTALLATION SCRIPT by kuperjamper13
+#  UI INITIALIZATION & THEME
 # ==============================================================================
 # Reset
 NC='\033[0m'
 
-# Palette
+# Professional Palette
 BOLD='\033[1m'
 MAGENTA='\033[1;35m'
 CYAN='\033[1;36m'
@@ -17,12 +17,11 @@ RED='\033[1;31m'
 WHITE='\033[1;37m'
 DIM='\033[2m'
 
-# Text Icons (Strictly ASCII)
+# Standard Icons
 ICON_OK="[${GREEN} OK ${NC}]"
 ICON_ERR="[${RED}FAIL${NC}]"
 ICON_ASK="[${MAGENTA} ?? ${NC}]"
 ICON_INF="[${CYAN} :: ${NC}]"
-ICON_WARN="[${YELLOW}WARN${NC}]"
 
 # UI Helpers
 function draw_line {
@@ -42,7 +41,7 @@ function show_header {
     echo "  ░    ▒     ░░   ░ ░          ░  ░░ ░"
     echo "       ░  ░   ░      ░ ░       ░  ░  ░"
     echo -e "${NC}"
-    echo -e "${CYAN}   // AUTOMATED INSTALLATION SYSTEM v4.0 (UNIVERSAL) //${NC}"
+    echo -e "${CYAN}   // ARCH LINUX INSTALLER v4.1 (STABLE) //${NC}"
     draw_line
 }
 
@@ -54,23 +53,22 @@ function step_title {
 show_header
 
 # ==============================================================================
-# 1. HOSTNAME
+# 1. HOSTNAME CONFIGURATION
 # ==============================================================================
 step_title "1" "SYSTEM IDENTITY"
-echo -e "${WHITE}Name your machine on the network.${NC}"
-echo -e "${DIM}Examples: arch-station, reactor-core, ghost-shell${NC}\n"
+echo -e "${WHITE}Configure the network hostname for this machine.${NC}"
 
 read -p "$(echo -e "${ICON_ASK} Enter Hostname [default: arch-linux]: ${NC}")" MY_HOSTNAME
 [[ -z "$MY_HOSTNAME" ]] && MY_HOSTNAME="arch-linux"
 echo -e "${ICON_OK} Hostname set to: ${BOLD}$MY_HOSTNAME${NC}"
 
 # ==============================================================================
-# 2. KEYBOARD
+# 2. KEYBOARD LAYOUT
 # ==============================================================================
 step_title "2" "INPUT CONFIGURATION"
-echo -e "${WHITE}Select your physical keyboard layout:${NC}"
+echo -e "${WHITE}Select physical keyboard layout:${NC}"
 
-PS3=$(echo -e "\n${ICON_ASK} Select Number: ${NC}")
+PS3=$(echo -e "\n${ICON_ASK} Select Option: ${NC}")
 options=("US (ANSI)" "ES (ISO Spanish)" "LATAM" "UK" "DE" "FR" "PT" "IT" "RU" "JP" "Manual Input")
 
 select opt in "${options[@]}"; do
@@ -92,13 +90,12 @@ done
 echo -e "${ICON_OK} Keymap set to: ${BOLD}$KEYMAP${NC}"
 
 # ==============================================================================
-# 3. LOCALE
+# 3. LOCALE CONFIGURATION
 # ==============================================================================
-step_title "3" "SYSTEM LANGUAGE"
+step_title "3" "REGION & LANGUAGE"
 echo -e "${WHITE}Select system display language:${NC}"
-echo -e "${DIM}(English is recommended for development)${NC}"
 
-PS3=$(echo -e "\n${ICON_ASK} Select Number: ${NC}")
+PS3=$(echo -e "\n${ICON_ASK} Select Option: ${NC}")
 locales=("English (US)" "Spanish (Spain)" "Spanish (Mexico)" "French" "German" "Portuguese" "Italian" "Russian" "Japanese" "Chinese" "Manual Input")
 
 select opt in "${locales[@]}"; do
@@ -120,16 +117,14 @@ done
 echo -e "${ICON_OK} Locale set to: ${BOLD}$LOCALE${NC}"
 
 # ==============================================================================
-# 4. TIMEZONE (NESTED MENU)
+# 4. TIMEZONE SELECTION
 # ==============================================================================
-step_title "4" "TIMEZONE SELECTOR"
-echo -e "${WHITE}Follow the menus to locate your city.${NC}"
+step_title "4" "TIMEZONE"
+echo -e "${WHITE}Locate your city.${NC}"
 
-# 1. REGION SELECTION
+# 1. REGION
 echo -e "\n${CYAN}:: Select Continent / Region ::${NC}"
-PS3=$(echo -e "\n${ICON_ASK} Region Number: ${NC}")
-
-# Get list of top-level regions (filtering out noise like right, posix, etc)
+PS3=$(echo -e "\n${ICON_ASK} Select Region: ${NC}")
 regions=$(find /usr/share/zoneinfo -maxdepth 1 -type d | cut -d/ -f5 | grep -vE "posix|right|Etc|SystemV|iso3166|Arctic|Antarctica")
 
 select region in $regions; do
@@ -141,11 +136,9 @@ select region in $regions; do
     fi
 done
 
-# 2. CITY SELECTION
+# 2. CITY
 echo -e "\n${CYAN}:: Select City in $SELECTED_REGION ::${NC}"
-PS3=$(echo -e "\n${ICON_ASK} City Number (Press Enter to see more): ${NC}")
-
-# List cities in that region
+PS3=$(echo -e "\n${ICON_ASK} Select City (Enter for more): ${NC}")
 cities=$(ls /usr/share/zoneinfo/$SELECTED_REGION)
 
 select city in $cities; do
@@ -156,100 +149,112 @@ select city in $cities; do
         echo -e "${ICON_ERR} Invalid selection."
     fi
 done
-
 echo -e "${ICON_OK} Timezone set to: ${BOLD}$TIMEZONE${NC}"
 
 # ==============================================================================
-# 5. NETWORK
+# 5. NETWORK SETUP
 # ==============================================================================
-step_title "5" "CONNECTIVITY CHECK"
+step_title "5" "NETWORK CONNECTIVITY"
 
 if ping -c 1 google.com &> /dev/null; then
     echo -e "${ICON_OK} ${GREEN}System is Online.${NC}"
 else
-    echo -e "${ICON_ERR} ${YELLOW}Offline.${NC} Initializing WiFi Wizard..."
+    echo -e "${ICON_ERR} ${YELLOW}Offline.${NC} Initializing Network Manager..."
     
     WIFI_INTERFACE=$(ip link | awk -F: '$0 !~ "lo|vir|eth" {print $2;getline}' | head -n 1 | tr -d ' ')
     
-    echo -e "${ICON_INF} Scanning on ${BOLD}$WIFI_INTERFACE${NC}..."
+    echo -e "${ICON_INF} Interface: ${BOLD}$WIFI_INTERFACE${NC}"
     iwctl station $WIFI_INTERFACE scan
     iwctl station $WIFI_INTERFACE get-networks
     echo ""
 
-    # Loop until connected
     while true; do
-        echo -e "${CYAN}:: Enter WiFi Credentials ::${NC}"
-        read -p "$(echo -e "${ICON_ASK} WiFi Name (SSID): ${NC}")" WIFI_SSID
-        read -s -p "$(echo -e "${ICON_ASK} WiFi Password: ${NC}")" WIFI_PASS
+        echo -e "${CYAN}:: WiFi Credentials ::${NC}"
+        read -p "$(echo -e "${ICON_ASK} SSID: ${NC}")" WIFI_SSID
+        read -s -p "$(echo -e "${ICON_ASK} Password: ${NC}")" WIFI_PASS
         echo ""
         
-        echo -e "${ICON_INF} Attempting connection to ${BOLD}$WIFI_SSID${NC}..."
+        echo -e "${ICON_INF} Connecting to ${BOLD}$WIFI_SSID${NC}..."
         iwctl --passphrase "$WIFI_PASS" station $WIFI_INTERFACE connect "$WIFI_SSID"
         
-        # Wait a bit longer for DHCP negotiation
-        echo -e "${ICON_INF} Verifying connection (Waiting 8s)..."
+        echo -e "${ICON_INF} Verifying (8s)..."
         sleep 8
         
         if ping -c 1 google.com &> /dev/null; then
-            echo -e "${ICON_OK} ${GREEN}Connected Successfully.${NC}"
+            echo -e "${ICON_OK} ${GREEN}Connected.${NC}"
             break
         else
-            echo -e "${ICON_ERR} ${RED}Connection Failed or Wrong Password.${NC}"
-            echo -e "${DIM}Please try again...${NC}\n"
+            echo -e "${ICON_ERR} ${RED}Connection Failed.${NC}"
+            echo -e "${DIM}Retry credentials...${NC}\n"
         fi
     done
 fi
 
 # ==============================================================================
-# 6. UNIVERSAL PARTITIONING (THE ADVISOR)
+# 6. DISK CONFIGURATION (UNIVERSAL)
 # ==============================================================================
 show_header
-step_title "6" "DISK STRATEGY"
+step_title "6" "DISK PARTITIONING"
 
-# 1. DISK SELECTION
-echo -e "${CYAN}:: Detected Storage Devices ::${NC}"
+# 1. DISK SELECTION & SANITIZATION
+echo -e "${CYAN}:: Available Storage ::${NC}"
 lsblk -d -n -o NAME,SIZE,MODEL,TYPE | grep 'disk' | awk '{print " /dev/" $1 " (" $2 ") - " $3}'
 echo ""
-read -p "$(echo -e "${ICON_ASK} Enter Target Drive (e.g. nvme0n1): ${NC}")" DISK_NAME
-TARGET_DISK="/dev/$DISK_NAME"
 
-# 2. SYSTEM ADVISOR
-echo -e "\n${CYAN}:: System Advisor ::${NC}"
+# FIX: Input Sanitization Loop
+while true; do
+    read -p "$(echo -e "${ICON_ASK} Enter Target Drive (e.g. nvme0n1 or /dev/vda): ${NC}")" DISK_INPUT
+    
+    # Strip '/dev/' if the user typed it, then add it back cleanly
+    CLEAN_NAME=${DISK_INPUT#/dev/}
+    TARGET_DISK="/dev/$CLEAN_NAME"
+
+    if lsblk -d "$TARGET_DISK" &>/dev/null; then
+        echo -e "${ICON_OK} Target selected: ${BOLD}$TARGET_DISK${NC}"
+        break
+    else
+        echo -e "${ICON_ERR} Device $TARGET_DISK not found. Try again."
+    fi
+done
+
+# 2. HARDWARE ANALYSIS
+echo -e "\n${CYAN}:: System Analysis ::${NC}"
 TOTAL_RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
 TOTAL_RAM_GB=$(($TOTAL_RAM_KB / 1024 / 1024))
 
-echo -e " [RAM]  Detected ${BOLD}${TOTAL_RAM_GB}GB${NC} RAM."
+echo -e " [RAM]  Detected ${BOLD}${TOTAL_RAM_GB}GB${NC}."
 if [ $TOTAL_RAM_GB -ge 8 ]; then
-    echo -e "        ${GREEN}Recommendation:${NC} Use a SWAPFILE (Managed automatically)."
+    echo -e "        ${GREEN}Advice:${NC} Swap partition not required. Will use Swapfile."
 else
-    echo -e "        ${YELLOW}Recommendation:${NC} RAM is low. We will create a large Swapfile."
+    echo -e "        ${YELLOW}Advice:${NC} Low RAM. Will create optimized Swapfile."
 fi
 
-echo -e " [DISK] Selected ${BOLD}$TARGET_DISK${NC}."
-echo -e "        ${GREEN}Recommendation:${NC} Create ${BOLD}ONE${NC} partition for Arch (Min 25GB)."
-echo -e "        If dual-booting, leave Windows/Fedora partitions alone."
+echo -e " [DISK] Target ${BOLD}$TARGET_DISK${NC}."
+echo -e "        ${GREEN}Advice:${NC} Create 1 partition for Arch (Min 25GB)."
+echo -e "        Leave existing Windows/Data partitions untouched."
 
-# 3. VISUAL EDITOR
-echo -e "\n${CYAN}:: Launching Partition Editor ::${NC}"
-echo -e "${DIM}1. Select 'Free Space' -> 'New'."
-echo -e "2. Select Type 'Linux filesystem'."
-echo -e "3. Select 'Write' -> type 'yes'."
-echo -e "4. Select 'Quit'.${NC}"
-read -p "Press Enter to open cfdisk..."
+# 3. PARTITION MANAGER
+echo -e "\n${CYAN}:: Partition Manager (cfdisk) ::${NC}"
+echo -e "${DIM}Instructions:"
+echo -e "1. Highlight 'Free Space' > Select [ New ]."
+echo -e "2. Select [ Type ] > 'Linux filesystem'."
+echo -e "3. Select [ Write ] > Type 'yes'."
+echo -e "4. Select [ Quit ].${NC}"
+read -p "Press Enter to launch..."
 cfdisk $TARGET_DISK
 partprobe $TARGET_DISK
 sleep 2
 
-# 4. EFI SELECTION (SMART DETECT)
-echo -e "\n${CYAN}:: Boot Partition (EFI) Selection ::${NC}"
-# Try to find existing EFI (look for vfat or ESP labels)
+# 4. BOOT PARTITION (EFI)
+echo -e "\n${CYAN}:: Boot Configuration (EFI) ::${NC}"
+# Smart Detect
 AUTO_EFI=$(fdisk -l $TARGET_DISK | grep 'EFI System' | awk '{print $1}' | head -n 1)
 
 if [[ -n "$AUTO_EFI" ]]; then
-    echo -e "${ICON_OK} Detected existing EFI Partition: ${BOLD}$AUTO_EFI${NC}"
-    read -p "$(echo -e "${ICON_ASK} Use this partition for Boot? (Safe for Windows) [Y/n]: ${NC}")" USE_AUTO
+    echo -e "${ICON_OK} Detected Windows Boot Manager: ${BOLD}$AUTO_EFI${NC}"
+    read -p "$(echo -e "${ICON_ASK} Use this for Boot? (Safe/Dual-Boot) [Y/n]: ${NC}")" USE_AUTO
     if [[ "$USE_AUTO" =~ ^[Nn]$ ]]; then
-        AUTO_EFI="" # User rejected auto, force manual select
+        AUTO_EFI="" 
     else
         EFI_PART=$AUTO_EFI
         FORMAT_EFI="no" # PROTECT WINDOWS
@@ -259,34 +264,38 @@ fi
 if [[ -z "$EFI_PART" ]]; then
     # Manual Select
     lsblk $TARGET_DISK -o NAME,SIZE,TYPE,FSTYPE,LABEL | grep 'part'
-    read -p "$(echo -e "${ICON_ASK} Enter EFI Partition (e.g. ${DISK_NAME}p1): ${NC}")" EFI_PART
-    EFI_PART="/dev/$EFI_PART"
-    FORMAT_EFI="yes" # Assume new if manually picked and not auto-detected
+    read -p "$(echo -e "${ICON_ASK} Select EFI Partition (e.g. ${CLEAN_NAME}p1): ${NC}")" EFI_INPUT
+    # Sanitize input again just in case
+    EFI_CLEAN=${EFI_INPUT#/dev/}
+    EFI_PART="/dev/$EFI_CLEAN"
+    FORMAT_EFI="yes" 
 fi
 
-# 5. ROOT SELECTION
-echo -e "\n${CYAN}:: Root Partition (System) Selection ::${NC}"
+# 5. ROOT PARTITION
+echo -e "\n${CYAN}:: Root Partition (System) ::${NC}"
 lsblk $TARGET_DISK -o NAME,SIZE,TYPE,FSTYPE,LABEL | grep 'part' | grep -v "$(basename $EFI_PART)"
-read -p "$(echo -e "${ICON_ASK} Enter Root Partition (e.g. ${DISK_NAME}p3): ${NC}")" ROOT_PART
-ROOT_PART="/dev/$ROOT_PART"
+read -p "$(echo -e "${ICON_ASK} Select Root Partition (e.g. ${CLEAN_NAME}p3): ${NC}")" ROOT_INPUT
+ROOT_CLEAN=${ROOT_INPUT#/dev/}
+ROOT_PART="/dev/$ROOT_CLEAN"
 
-# 6. HOME SELECTION (OPTIONAL)
+# 6. HOME PARTITION (OPTIONAL)
 echo -e "\n${CYAN}:: Home Partition (Optional) ::${NC}"
-read -p "$(echo -e "${ICON_ASK} Do you have a separate Home partition? [y/N]: ${NC}")" HAS_HOME
+read -p "$(echo -e "${ICON_ASK} Separate Home partition? [y/N]: ${NC}")" HAS_HOME
 if [[ "$HAS_HOME" =~ ^[Yy]$ ]]; then
-    read -p "$(echo -e "${ICON_ASK} Enter Home Partition: ${NC}")" HOME_PART
-    HOME_PART="/dev/$HOME_PART"
+    read -p "$(echo -e "${ICON_ASK} Select Home Partition: ${NC}")" HOME_INPUT
+    HOME_CLEAN=${HOME_INPUT#/dev/}
+    HOME_PART="/dev/$HOME_CLEAN"
 fi
 
 # 7. CONFIRMATION
 echo -e "\n${RED}========================================${NC}"
-echo -e "${RED}   FINAL CONFIRMATION                   ${NC}"
+echo -e "${RED}   CONFIRM INSTALLATION TARGETS         ${NC}"
 echo -e "${RED}========================================${NC}"
 echo -e "Disk: ${BOLD}$TARGET_DISK${NC}"
 echo -e "EFI:  ${GREEN}$EFI_PART${NC} (Format: $FORMAT_EFI)"
-echo -e "Root: ${RED}$ROOT_PART${NC} (Format: YES - WIPES DATA)"
+echo -e "Root: ${RED}$ROOT_PART${NC} (Format: YES - WIPE)"
 if [[ -n "$HOME_PART" ]]; then
-    echo -e "Home: ${BLUE}$HOME_PART${NC} (Format: NO - KEEPS DATA)"
+    echo -e "Home: ${BLUE}$HOME_PART${NC} (Format: NO - KEEP DATA)"
 fi
 echo ""
 read -p "$(echo -e "${ICON_ASK} Type 'yes' to Install: ${NC}")" CONFIRM
@@ -296,87 +305,75 @@ if [ "$CONFIRM" != "yes" ]; then echo "Aborted."; exit 1; fi
 # INSTALLATION PROCESS
 # ==============================================================================
 show_header
-echo -e "${CYAN}:: SYSTEM INSTALLATION IN PROGRESS... ::${NC}"
+echo -e "${CYAN}:: INSTALLING SYSTEM BASE ::${NC}"
 
-# --- OPTIMIZATION START ---
-echo -e "${ICON_INF} Configuring Parallel Downloads..."
+# Optimization
+echo -e "${ICON_INF} Enabling Parallel Downloads..."
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
-# --- OPTIMIZATION END ---
 
-# Format Root
+# Formatting
 echo -e "${ICON_INF} Formatting Root ($ROOT_PART)..."
 mkfs.ext4 -F $ROOT_PART &>/dev/null
 
-# Format EFI (Only if new)
 if [ "$FORMAT_EFI" == "yes" ]; then
     echo -e "${ICON_INF} Formatting EFI ($EFI_PART)..."
     mkfs.vfat -F32 $EFI_PART &>/dev/null
 else
-    echo -e "${ICON_INF} Skipping EFI Format (Preserving existing bootloader)..."
+    echo -e "${ICON_INF} Preserving EFI Bootloader..."
 fi
 
-# Mount
-echo -e "${ICON_INF} Mounting System..."
+# Mounting
+echo -e "${ICON_INF} Mounting..."
 mount $ROOT_PART /mnt
 mkdir -p /mnt/boot
 mount $EFI_PART /mnt/boot
 
-# Mount Home (If selected)
 if [[ -n "$HOME_PART" ]]; then
-    echo -e "${ICON_INF} Mounting Home..."
     mkdir -p /mnt/home
     mount $HOME_PART /mnt/home
 fi
 
-# CPU Detection
-echo -e "${ICON_INF} Detecting CPU Vendor..."
+# CPU Microcode
+echo -e "${ICON_INF} Detecting CPU..."
 if grep -q "AuthenticAMD" /proc/cpuinfo; then
     MICROCODE="amd-ucode"
-    echo -e "${ICON_OK} AMD CPU detected. Queuing ${BOLD}amd-ucode${NC}."
 else
     MICROCODE="intel-ucode"
-    echo -e "${ICON_OK} Intel CPU detected. Queuing ${BOLD}intel-ucode${NC}."
 fi
 
-# Install
-echo -e "${ICON_INF} Downloading Packages..."
-# Included: base system, zen kernel (speed), firmware, microcode, network, 
-# mesa (graphics backend), pipewire (modern audio), power-profiles (battery)
+# Pacstrap
+echo -e "${ICON_INF} Installing Packages..."
 pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel clang git networkmanager nano \
     $MICROCODE mesa pipewire pipewire-alsa pipewire-pulse wireplumber power-profiles-daemon &>/dev/null
 
-echo -e "${ICON_INF} Generating Filesystem Table..."
+echo -e "${ICON_INF} Generating Fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
 
 # ==============================================================================
-# CONFIGURATION
+# SYSTEM CONFIGURATION
 # ==============================================================================
-echo -e "\n${CYAN}:: USER ACCOUNTS ::${NC}"
-read -p "$(echo -e "${ICON_ASK} New Username: ${NC}")" MY_USER
+echo -e "\n${CYAN}:: USER CONFIGURATION ::${NC}"
+read -p "$(echo -e "${ICON_ASK} Username: ${NC}")" MY_USER
 
-# --- PASSWORD LOOP START ---
 while true; do
-    echo -e "${CYAN}:: Set Password for $MY_USER ::${NC}"
-    read -s -p "$(echo -e "${ICON_ASK} Enter Password: ${NC}")" PASS1
+    echo -e "${CYAN}:: Password for $MY_USER ::${NC}"
+    read -s -p "$(echo -e "${ICON_ASK} Password: ${NC}")" PASS1
     echo
-    read -s -p "$(echo -e "${ICON_ASK} Confirm Password: ${NC}")" PASS2
+    read -s -p "$(echo -e "${ICON_ASK} Confirm:  ${NC}")" PASS2
     echo ""
     
     if [ "$PASS1" == "$PASS2" ] && [ ! -z "$PASS1" ]; then
         MY_PASS="$PASS1"
-        echo -e "${ICON_OK} Password matched."
         break
     else
-        echo -e "${ICON_ERR} Passwords do not match or are empty. Try again."
+        echo -e "${ICON_ERR} Mismatch. Try again."
     fi
 done
-# --- PASSWORD LOOP END ---
 
 export TIMEZONE LOCALE KEYMAP MY_HOSTNAME MY_USER MY_PASS
 
-echo -e "${ICON_INF} Configuring System Internals..."
+echo -e "${ICON_INF} Configuring System..."
 arch-chroot /mnt /bin/bash <<EOF
-# 1. Time & Locales
 ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
 hwclock --systohc
 echo "$LOCALE UTF-8" > /etc/locale.gen
@@ -385,39 +382,34 @@ echo "LANG=$LOCALE" > /etc/locale.conf
 echo "KEYMAP=$KEYMAP" > /etc/vconsole.conf
 echo "$MY_HOSTNAME" > /etc/hostname
 
-# 2. Users & Passwords
 echo "root:$MY_PASS" | chpasswd
 useradd -m -G wheel,storage,power -s /bin/bash $MY_USER
 echo "$MY_USER:$MY_PASS" | chpasswd
 echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
 
-# 3. Bootloader
 pacman -S --noconfirm grub efibootmgr os-prober > /dev/null
 echo "GRUB_DISABLE_OS_PROBER=false" >> /etc/default/grub
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=Arch > /dev/null
 grub-mkconfig -o /boot/grub/grub.cfg > /dev/null
 
-# 4. Services
 systemctl enable NetworkManager
 systemctl enable power-profiles-daemon
 
-# 5. Swap File (4GB - Prevents crashes)
-echo "Creating Swapfile..."
+# Swapfile (4GB)
 dd if=/dev/zero of=/swapfile bs=1G count=4 status=none
 chmod 600 /swapfile
 mkswap /swapfile > /dev/null
 swapon /swapfile
 echo "/swapfile none swap defaults 0 0" >> /etc/fstab
 
-# 6. Quality of Life
-sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
+# Nano Config
 echo "set tabsize 4" > /home/$MY_USER/.nanorc
 echo "set tabstospaces" >> /home/$MY_USER/.nanorc
 chown $MY_USER:$MY_USER /home/$MY_USER/.nanorc
 EOF
 
 echo -e "\n${GREEN}========================================${NC}"
-echo -e "${GREEN}   INSTALLATION COMPLETE!               ${NC}"
+echo -e "${GREEN}   INSTALLATION COMPLETE                ${NC}"
 echo -e "${GREEN}========================================${NC}"
-echo -e "1. Reboot."
-echo -e "2. Log in as ${BOLD}$MY_USER${NC}."
+echo -e "1. Remove installation media."
+echo -e "2. Type 'reboot'."

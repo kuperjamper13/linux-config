@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-#  AESTHETIC CONFIGURATION (CYBERPUNK TERMINAL THEME)
+#  ARCH CONFIG AND INSTALLATION
 # ==============================================================================
 # Reset
 NC='\033[0m'

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH CONFIG AND INSTALLATION
+#  ARCH CONFIGURATION AND INSTALLATION SCRIPT by kuperjamper13
 # ==============================================================================
 # Reset
 NC='\033[0m'
@@ -22,6 +22,7 @@ ICON_OK="[${GREEN} OK ${NC}]"
 ICON_ERR="[${RED}FAIL${NC}]"
 ICON_ASK="[${MAGENTA} ?? ${NC}]"
 ICON_INF="[${CYAN} :: ${NC}]"
+ICON_WARN="[${YELLOW}WARN${NC}]"
 
 # UI Helpers
 function draw_line {
@@ -41,7 +42,7 @@ function show_header {
     echo "  ░    ▒     ░░   ░ ░          ░  ░░ ░"
     echo "       ░  ░   ░      ░ ░       ░  ░  ░"
     echo -e "${NC}"
-    echo -e "${CYAN}   // AUTOMATED INSTALLATION SYSTEM v3.4 (FINAL) //${NC}"
+    echo -e "${CYAN}   // AUTOMATED INSTALLATION SYSTEM v4.0 (UNIVERSAL) //${NC}"
     draw_line
 }
 
@@ -200,63 +201,96 @@ else
 fi
 
 # ==============================================================================
-# 6. PARTITIONING
+# 6. UNIVERSAL PARTITIONING (THE ADVISOR)
 # ==============================================================================
 show_header
-step_title "6" "INSTALLATION TARGET"
-echo -e "${WHITE}Choose your deployment strategy:${NC}\n"
+step_title "6" "DISK STRATEGY"
 
-echo -e "${BOLD}[1] MANUAL MODE${NC} (Dual Boot / Real Hardware)"
-echo -e "    ${DIM}Safe. You select existing partitions (Root & EFI).${NC}"
+# 1. DISK SELECTION
+echo -e "${CYAN}:: Detected Storage Devices ::${NC}"
+lsblk -d -n -o NAME,SIZE,MODEL,TYPE | grep 'disk' | awk '{print " /dev/" $1 " (" $2 ") - " $3}'
 echo ""
-echo -e "${BOLD}[2] AUTO MODE${NC} (Virtual Machine / Clean Wipe)"
-echo -e "    ${DIM}Automatic. Wipes entire disk. Creates partitions.${NC}"
-echo -e "    ${RED}WARNING: DATA DESTRUCTION.${NC}"
-echo ""
+read -p "$(echo -e "${ICON_ASK} Enter Target Drive (e.g. nvme0n1): ${NC}")" DISK_NAME
+TARGET_DISK="/dev/$DISK_NAME"
 
-read -p "$(echo -e "${ICON_ASK} Select Mode [1 or 2]: ${NC}")" PART_MODE
+# 2. SYSTEM ADVISOR
+echo -e "\n${CYAN}:: System Advisor ::${NC}"
+TOTAL_RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+TOTAL_RAM_GB=$(($TOTAL_RAM_KB / 1024 / 1024))
 
-if [ "$PART_MODE" == "2" ]; then
-    # --- AUTO MODE ---
-    echo -e "\n${CYAN}:: Available Disks ::${NC}"
-    lsblk -d -o NAME,SIZE,MODEL
-    echo ""
-    read -p "$(echo -e "${ICON_ERR} Enter disk to WIPE (e.g. /dev/vda): ${NC}")" TARGET_DISK
-    
-    echo -e "\n${RED}========================================${NC}"
-    echo -e "${RED}   DANGER: WIPING $TARGET_DISK          ${NC}"
-    echo -e "${RED}========================================${NC}"
-    echo ""
-    read -p "$(echo -e "${ICON_ASK} Type 'DESTROY' to confirm: ${NC}")" CONFIRM
-    if [ "$CONFIRM" != "DESTROY" ]; then echo "Aborted."; exit 1; fi
-
-    echo -e "${ICON_INF} Partitioning Drive..."
-    sgdisk -Z $TARGET_DISK &>/dev/null
-    sgdisk -n 1:0:+512M -t 1:ef00 $TARGET_DISK &>/dev/null
-    sgdisk -n 2:0:0 -t 2:8304 $TARGET_DISK &>/dev/null
-    partprobe $TARGET_DISK
-    sleep 2
-
-    if [[ "$TARGET_DISK" == *"nvme"* ]]; then
-        EFI_PART="${TARGET_DISK}p1"; ROOT_PART="${TARGET_DISK}p2"
-    else
-        EFI_PART="${TARGET_DISK}1"; ROOT_PART="${TARGET_DISK}2"
-    fi
-
+echo -e " [RAM]  Detected ${BOLD}${TOTAL_RAM_GB}GB${NC} RAM."
+if [ $TOTAL_RAM_GB -ge 8 ]; then
+    echo -e "        ${GREEN}Recommendation:${NC} Use a SWAPFILE (Managed automatically)."
 else
-    # --- MANUAL MODE ---
-    echo -e "\n${CYAN}:: Partition Map ::${NC}"
-    lsblk -o NAME,SIZE,TYPE,FSTYPE,LABEL,MOUNTPOINT
-    echo ""
-    read -p "$(echo -e "${ICON_ASK} TARGET Partition (50GB+): ${NC}")" ROOT_PART
-    read -p "$(echo -e "${ICON_ASK} EFI Partition (~500MB):   ${NC}")" EFI_PART
-    
-    echo -e "\n${CYAN}:: Summary ::${NC}"
-    echo -e "Format: ${RED}$ROOT_PART${NC} (EXT4)"
-    echo -e "Keep:   ${GREEN}$EFI_PART${NC} (EFI)"
-    read -p "$(echo -e "${ICON_ASK} Type 'yes' to proceed: ${NC}")" CONFIRM
-    if [ "$CONFIRM" != "yes" ]; then echo "Aborted."; exit 1; fi
+    echo -e "        ${YELLOW}Recommendation:${NC} RAM is low. We will create a large Swapfile."
 fi
+
+echo -e " [DISK] Selected ${BOLD}$TARGET_DISK${NC}."
+echo -e "        ${GREEN}Recommendation:${NC} Create ${BOLD}ONE${NC} partition for Arch (Min 25GB)."
+echo -e "        If dual-booting, leave Windows/Fedora partitions alone."
+
+# 3. VISUAL EDITOR
+echo -e "\n${CYAN}:: Launching Partition Editor ::${NC}"
+echo -e "${DIM}1. Select 'Free Space' -> 'New'."
+echo -e "2. Select Type 'Linux filesystem'."
+echo -e "3. Select 'Write' -> type 'yes'."
+echo -e "4. Select 'Quit'.${NC}"
+read -p "Press Enter to open cfdisk..."
+cfdisk $TARGET_DISK
+partprobe $TARGET_DISK
+sleep 2
+
+# 4. EFI SELECTION (SMART DETECT)
+echo -e "\n${CYAN}:: Boot Partition (EFI) Selection ::${NC}"
+# Try to find existing EFI (look for vfat or ESP labels)
+AUTO_EFI=$(fdisk -l $TARGET_DISK | grep 'EFI System' | awk '{print $1}' | head -n 1)
+
+if [[ -n "$AUTO_EFI" ]]; then
+    echo -e "${ICON_OK} Detected existing EFI Partition: ${BOLD}$AUTO_EFI${NC}"
+    read -p "$(echo -e "${ICON_ASK} Use this partition for Boot? (Safe for Windows) [Y/n]: ${NC}")" USE_AUTO
+    if [[ "$USE_AUTO" =~ ^[Nn]$ ]]; then
+        AUTO_EFI="" # User rejected auto, force manual select
+    else
+        EFI_PART=$AUTO_EFI
+        FORMAT_EFI="no" # PROTECT WINDOWS
+    fi
+fi
+
+if [[ -z "$EFI_PART" ]]; then
+    # Manual Select
+    lsblk $TARGET_DISK -o NAME,SIZE,TYPE,FSTYPE,LABEL | grep 'part'
+    read -p "$(echo -e "${ICON_ASK} Enter EFI Partition (e.g. ${DISK_NAME}p1): ${NC}")" EFI_PART
+    EFI_PART="/dev/$EFI_PART"
+    FORMAT_EFI="yes" # Assume new if manually picked and not auto-detected
+fi
+
+# 5. ROOT SELECTION
+echo -e "\n${CYAN}:: Root Partition (System) Selection ::${NC}"
+lsblk $TARGET_DISK -o NAME,SIZE,TYPE,FSTYPE,LABEL | grep 'part' | grep -v "$(basename $EFI_PART)"
+read -p "$(echo -e "${ICON_ASK} Enter Root Partition (e.g. ${DISK_NAME}p3): ${NC}")" ROOT_PART
+ROOT_PART="/dev/$ROOT_PART"
+
+# 6. HOME SELECTION (OPTIONAL)
+echo -e "\n${CYAN}:: Home Partition (Optional) ::${NC}"
+read -p "$(echo -e "${ICON_ASK} Do you have a separate Home partition? [y/N]: ${NC}")" HAS_HOME
+if [[ "$HAS_HOME" =~ ^[Yy]$ ]]; then
+    read -p "$(echo -e "${ICON_ASK} Enter Home Partition: ${NC}")" HOME_PART
+    HOME_PART="/dev/$HOME_PART"
+fi
+
+# 7. CONFIRMATION
+echo -e "\n${RED}========================================${NC}"
+echo -e "${RED}   FINAL CONFIRMATION                   ${NC}"
+echo -e "${RED}========================================${NC}"
+echo -e "Disk: ${BOLD}$TARGET_DISK${NC}"
+echo -e "EFI:  ${GREEN}$EFI_PART${NC} (Format: $FORMAT_EFI)"
+echo -e "Root: ${RED}$ROOT_PART${NC} (Format: YES - WIPES DATA)"
+if [[ -n "$HOME_PART" ]]; then
+    echo -e "Home: ${BLUE}$HOME_PART${NC} (Format: NO - KEEPS DATA)"
+fi
+echo ""
+read -p "$(echo -e "${ICON_ASK} Type 'yes' to Install: ${NC}")" CONFIRM
+if [ "$CONFIRM" != "yes" ]; then echo "Aborted."; exit 1; fi
 
 # ==============================================================================
 # INSTALLATION PROCESS
@@ -269,19 +303,30 @@ echo -e "${ICON_INF} Configuring Parallel Downloads..."
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 # --- OPTIMIZATION END ---
 
-# Format
-echo -e "${ICON_INF} Formatting Root..."
+# Format Root
+echo -e "${ICON_INF} Formatting Root ($ROOT_PART)..."
 mkfs.ext4 -F $ROOT_PART &>/dev/null
-if [ "$PART_MODE" == "2" ]; then
-    echo -e "${ICON_INF} Formatting EFI..."
+
+# Format EFI (Only if new)
+if [ "$FORMAT_EFI" == "yes" ]; then
+    echo -e "${ICON_INF} Formatting EFI ($EFI_PART)..."
     mkfs.vfat -F32 $EFI_PART &>/dev/null
+else
+    echo -e "${ICON_INF} Skipping EFI Format (Preserving existing bootloader)..."
 fi
 
 # Mount
-echo -e "${ICON_INF} Mounting..."
+echo -e "${ICON_INF} Mounting System..."
 mount $ROOT_PART /mnt
 mkdir -p /mnt/boot
 mount $EFI_PART /mnt/boot
+
+# Mount Home (If selected)
+if [[ -n "$HOME_PART" ]]; then
+    echo -e "${ICON_INF} Mounting Home..."
+    mkdir -p /mnt/home
+    mount $HOME_PART /mnt/home
+fi
 
 # CPU Detection
 echo -e "${ICON_INF} Detecting CPU Vendor..."

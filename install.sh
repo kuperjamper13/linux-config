@@ -1,49 +1,28 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v2.7.0
-#  Zen Kernel (Restored) | Strict Mode | Arch Standard Paths (/boot/efi)
+#  ARCH LINUX UNIVERSAL INSTALLER v2.8.0
+#  Zen Kernel | Strict Mode | Dry-Run Capable | Edge-Case Hardened
 # ==============================================================================
 
-# --- [0] SAFETY PRE-FLIGHT ----------------------------------------------------
-set -euo pipefail
+# --- [0] PRE-FLIGHT ARGUMENTS & CONFIG ----------------------------------------
+set -u # Undefined variables are errors
+set -o pipefail # Pipes fail if any command fails
 
-# 17. Edge-Case: ARM/Non-x86 detection
-if [[ "$(uname -m)" != "x86_64" ]]; then
-    echo "CRITICAL ERROR: This script is optimized for x86_64 architecture only."
-    exit 1
+# 1.1 Polish: Dry-run / simulation mode
+DRY_RUN=0
+if [[ "${1:-}" == "--dry-run" ]]; then
+    DRY_RUN=1
 fi
 
-# 5. Polish: Centralized logging (Pipe to file + screen)
-# Creates a log file but keeps stdout/stderr visible
+# 1.2 Polish: Logging (files + stdout)
 LOG_FILE="/tmp/arch-installer.log"
+# Ensure log file exists and we can write to it
+touch "$LOG_FILE"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
-# Check for UEFI Boot Mode
-if [[ ! -d /sys/firmware/efi ]]; then
-    echo -e "\n\033[1;31m CRITICAL ERROR: This script requires a UEFI boot environment.\033[0m"
-    echo " Please enable UEFI in your BIOS and disable CSM/Legacy Boot."
-    exit 1
-fi
-
-# 8. Polish: Dry Run Mode (Toggle to 1 to test without writing to disk)
-DRY_RUN=0
-
-# Global State for Trap
-DISK_MODIFIED=0
-
-cleanup() {
-    tput cnorm
-    if [[ "$DISK_MODIFIED" -eq 1 ]]; then
-        echo -e "\n\033[1;33m WARN \033[0m Script stopped after disk modification."
-        echo -e "\033[2m The system may be in a partial state.\033[0m"
-    fi
-}
-trap cleanup EXIT ERR
-
-# --- [1] VISUAL LIBRARY -------------------------------------------------------
-# 4. Polish: Color output auto-disable if not a TTY
-if [[ -t 1 ]]; then
+# 1.6 Polish: Color disable fallback
+if [[ -t 1 ]] && command -v tput &>/dev/null && [[ $(tput colors) -ge 8 ]]; then
     NC='\033[0m'
     BOLD='\033[1m'
     MAGENTA='\033[1;35m'
@@ -54,15 +33,7 @@ if [[ -t 1 ]]; then
     WHITE='\033[1;37m'
     DIM='\033[2m'
 else
-    NC=""
-    BOLD=""
-    MAGENTA=""
-    CYAN=""
-    GREEN=""
-    YELLOW=""
-    RED=""
-    WHITE=""
-    DIM=""
+    NC=""; BOLD=""; MAGENTA=""; CYAN=""; GREEN=""; YELLOW=""; RED=""; WHITE=""; DIM=""
 fi
 
 ICON_OK="[${GREEN}  OK  ${NC}]"
@@ -72,7 +43,55 @@ ICON_ASK="[${MAGENTA}  ??  ${NC}]"
 ICON_INF="[${CYAN} INFO ${NC}]"
 ICON_DRY="[${MAGENTA} DRY  ${NC}]"
 
-# --- [2] UI UTILITIES ---------------------------------------------------------
+# 1.3 Polish: Clearer fatal error helper
+fatal() {
+    echo -e "\n${ICON_ERR} ${BOLD}CRITICAL ERROR:${NC} $1"
+    echo -e "${DIM} See $LOG_FILE for details.${NC}"
+    exit 1
+}
+
+# Wrapper for destructive commands
+run_safe() {
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo -e "${ICON_DRY} Would run: $*"
+    else
+        eval "$@"
+    fi
+}
+
+# 17. Edge-Case: ARM/Non-x86 detection
+if [[ "$(uname -m)" != "x86_64" ]]; then
+    fatal "This script is optimized for x86_64 architecture only."
+fi
+
+# Check for UEFI Boot Mode
+if [[ ! -d /sys/firmware/efi ]]; then
+    fatal "This script requires a UEFI boot environment."
+fi
+
+# 2.5 Edge-Case: Secure Boot Warning
+if command -v mokutil &>/dev/null; then
+    if mokutil --sb-state 2>/dev/null | grep -q "enabled"; then
+        echo -e "${ICON_WRN} ${YELLOW}Secure Boot is ENABLED.${NC} GRUB may require manual signing."
+        sleep 2
+    fi
+fi
+
+# Global State for Trap
+DISK_MODIFIED=0
+
+cleanup() {
+    tput cnorm 2>/dev/null || true
+    if [[ "$DISK_MODIFIED" -eq 1 ]]; then
+        echo -e "\n${ICON_WRN} Script stopped after disk modification."
+        echo -e "${DIM} The system may be in a partial state.${NC}"
+    fi
+}
+# 1.7 Polish: Trap SIGINT separately
+trap 'echo -e "\n${ICON_WRN} Interrupted by user."; exit 130' SIGINT
+trap cleanup EXIT ERR
+
+# --- [1] UI UTILITIES ---------------------------------------------------------
 function hard_clear {
     printf "\033c"
 }
@@ -85,7 +104,7 @@ function print_banner {
     echo " ██║╚██╗    ██╔══██╗ ██║        ██╔══██║"
     echo " ██║ ╚██╗   ██║  ██║ ████████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝   ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.7.0"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.8.0"
     echo "  >> ZEN KERNEL + ARCH STANDARDS"
     echo -e "${NC}"
     
@@ -130,10 +149,8 @@ function print_menu_grid {
     for (( i=0; i<half; i++ )); do
         val1="${arr[$i]}"
         val2="${arr[$i+half]:-}"
-        
         idx1=$((i+1))
         printf "  ${CYAN}%2d)${NC} %-25s" "$idx1" "$val1"
-        
         if [[ -n "$val2" ]]; then
             idx2=$((i+half+1))
             printf "  ${CYAN}%2d)${NC} %-25s" "$idx2" "$val2"
@@ -143,15 +160,13 @@ function print_menu_grid {
     echo ""
 }
 
-# --- [3] ANIMATION UTILITIES --------------------------------------------------
 function show_progress_bar {
     local pid=$1
-    local delay=0.1
     local width=30
     local i=0
     local direction=1
     
-    tput civis
+    tput civis 2>/dev/null || true
     echo -ne "\n  ${BOLD}Installing:${NC} ["
     
     while ps -p "$pid" > /dev/null; do
@@ -163,13 +178,13 @@ function show_progress_bar {
         
         i=$((i + direction))
         if [ $i -ge $((width - 3)) ] || [ $i -le 0 ]; then direction=$((direction * -1)); fi
-        sleep $delay
+        sleep 0.1
     done
     
     local full_bar=$(printf '=%0.s' $(seq 1 $width))
     printf "\r  ${BOLD}Installing:${NC} [${CYAN}$full_bar${NC}] Done\n"
     sleep 1
-    tput cnorm
+    tput cnorm 2>/dev/null || true
 }
 
 # ==============================================================================
@@ -196,7 +211,6 @@ while true; do
     ask_input "K_OPT" "Select Layout Number"
     if [[ "$K_OPT" =~ ^[0-9]+$ ]] && [ "$K_OPT" -ge 1 ] && [ "$K_OPT" -le "${#keymaps[@]}" ]; then
         KEYMAP="${keymaps[$((K_OPT-1))]}"
-        echo -e "${ICON_OK} Selected: ${BOLD}$KEYMAP${NC}"
         break
     else
         echo -e "${ICON_ERR} Invalid option."
@@ -212,13 +226,10 @@ while true; do
     ask_input "L_OPT" "Select Language Number"
     if [[ "$L_OPT" =~ ^[0-9]+$ ]] && [ "$L_OPT" -ge 1 ] && [ "$L_OPT" -le "${#locales[@]}" ]; then
         LOCALE="${locales[$((L_OPT-1))]}"
-        
         # 12. Edge-Case: Locale Validation
         if ! grep -q "$LOCALE" /usr/share/i18n/SUPPORTED; then
             echo -e "${ICON_WRN} Locale $LOCALE not found in supported list. Proceeding anyway."
         fi
-        
-        echo -e "${ICON_OK} Selected: ${BOLD}$LOCALE${NC}"
         break
     else
         echo -e "${ICON_ERR} Invalid option."
@@ -242,7 +253,7 @@ done
 
 echo -e "\n${ICON_INF} Select City in $REGION"
 mapfile -t cities < <(ls "/usr/share/zoneinfo/$REGION")
-short_cities=("${cities[@]:0:20}")
+short_cities=("${cities[@]:0:20}") # Limit to top 20 to prevent scrolling overflow
 print_menu_grid short_cities
 
 while true; do
@@ -255,12 +266,10 @@ while true; do
     
     if [ -f "/usr/share/zoneinfo/$REGION/$CITY" ]; then
         TIMEZONE="$REGION/$CITY"
-        echo -e "${ICON_OK} Timezone set to: ${BOLD}$TIMEZONE${NC}"
-        # 20. Edge-Case: Time Skew handled here
         timedatectl set-ntp true
         break
     else
-        echo -e "${ICON_ERR} Invalid Timezone: $REGION/$CITY does not exist."
+        echo -e "${ICON_ERR} Invalid Timezone."
     fi
 done
 sleep 1
@@ -270,13 +279,22 @@ sleep 1
 # ==============================================================================
 start_step "3" "NETWORK CONNECTIVITY CHECK"
 
-if ping -c 1 google.com &> /dev/null || true; then
-    if ping -c 1 google.com &> /dev/null; then
+# 2.2 Edge-Case: IPv6 Fallback
+check_internet() {
+    ping -c 1 google.com &>/dev/null || ping -6 -c 1 google.com &>/dev/null
+}
+
+if check_internet || true; then
+    if check_internet; then
         echo -e "${ICON_OK} Internet Connection: ${GREEN}Active${NC}"
     else
         echo -e "${ICON_ERR} Internet Connection: ${RED}Offline${NC}"
-        echo -e "${DIM}Initializing Wireless Interface...${NC}"
         
+        # 2.2 Edge-Case: Check if iwctl exists
+        if ! command -v iwctl &>/dev/null; then
+            fatal "iwctl not found. Cannot configure WiFi."
+        fi
+
         WIFI_INTERFACE=$(ip link | awk -F: '$0 !~ "lo|vir|eth" {print $2;getline}' | head -n 1 | tr -d ' ')
         
         if [[ -z "$WIFI_INTERFACE" ]]; then
@@ -292,19 +310,15 @@ if ping -c 1 google.com &> /dev/null || true; then
             while true; do
                 echo -e "${ICON_ASK} WiFi Authentication Required"
                 ask_input "WIFI_SSID" "SSID Name"
-                
                 echo -ne "${YELLOW}${BOLD} ➜ ${NC}${WHITE}Password${NC}: "
                 read -s WIFI_PASS
                 echo ""
                 
-                echo -e "${ICON_INF} Authenticating with ${BOLD}$WIFI_SSID${NC}..."
                 iwctl --passphrase "$WIFI_PASS" station "$WIFI_INTERFACE" connect "$WIFI_SSID"
-                
-                echo -e "${ICON_INF} Verifying Handshake (8s timeout)..."
                 sleep 8
                 
-                if ping -c 1 google.com &> /dev/null; then
-                    echo -e "${ICON_OK} ${GREEN}Connection Established Successfully.${NC}"
+                if check_internet; then
+                    echo -e "${ICON_OK} ${GREEN}Connection Established.${NC}"
                     timedatectl set-ntp true
                     break
                 else
@@ -315,19 +329,22 @@ if ping -c 1 google.com &> /dev/null || true; then
     fi
 fi
 
-# 13. Edge-Case: Network captive portals check
-echo -e "${ICON_INF} Checking HTTP connectivity..."
+# 2.2 Edge-Case: Captive Portal Check
 if ! curl -I https://archlinux.org &>/dev/null; then
     echo -e "${ICON_WRN} HTTP check failed. You may be behind a captive portal."
-else
-    echo -e "${ICON_OK} HTTP Connectivity confirmed."
 fi
 
-# 14. Edge-Case: Slow mirrors (Reflector)
-echo -e "${ICON_INF} Optimizing Mirrorlist (Reflector)..."
-# Using a 5 second timeout per mirror to avoid hanging
-reflector --latest 5 --sort rate --save /etc/pacman.d/mirrorlist --protocol https --download-timeout 5 &>/dev/null || echo -e "${ICON_WRN} Reflector failed, using default mirrors."
+# 2.7 Edge-Case: Update Keyring before doing anything else
+echo -e "${ICON_INF} Updating Arch Keyring (Prevents signature errors)..."
+if [[ "$DRY_RUN" -eq 0 ]]; then
+    pacman -Sy --noconfirm archlinux-keyring &>/dev/null || echo -e "${ICON_WRN} Keyring update failed."
+fi
 
+# 14. Edge-Case: Slow mirrors
+echo -e "${ICON_INF} Optimizing Mirrorlist..."
+if [[ "$DRY_RUN" -eq 0 ]]; then
+    reflector --latest 5 --sort rate --save /etc/pacman.d/mirrorlist --protocol https --download-timeout 5 &>/dev/null || echo -e "${ICON_WRN} Reflector failed, using default mirrors."
+fi
 sleep 1
 
 # ==============================================================================
@@ -347,10 +364,23 @@ while true; do
     if lsblk -d "$TARGET_DISK" &>/dev/null; then
         echo -e "${ICON_OK} Target Locked: ${BOLD}$TARGET_DISK${NC}"
         
-        # 19. Edge-Case: Small disk handling
+        # 2.1 Edge-Case: Drive is mounted
+        if lsblk -no MOUNTPOINT "$TARGET_DISK" | grep -q "/"; then
+            echo -e "${ICON_ERR} Drive is currently mounted. Unmount it first."
+            continue
+        fi
+
+        # 2.1 Edge-Case: LVM or LUKS detection
+        if lsblk -no TYPE "$TARGET_DISK" | grep -E "lvm|crypt" &>/dev/null; then
+            echo -e "${ICON_WRN} LVM or Encryption detected. Automatic partitioning might fail."
+            ask_input "LVM_CONF" "Continue anyway? (yes/no)"
+            [[ "$LVM_CONF" != "yes" ]] && continue
+        fi
+
+        # 19. Edge-Case: Small disk
         DISK_SIZE_BYTES=$(lsblk -dn -o SIZE -b "$TARGET_DISK")
         if (( DISK_SIZE_BYTES < 20*1024*1024*1024 )); then
-            echo -e "${ICON_WRN} Disk is smaller than 20GB. Installation may be tight."
+            echo -e "${ICON_WRN} Disk < 20GB. Installation may be tight."
         fi
         break
     else
@@ -363,13 +393,9 @@ TOTAL_RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
 TOTAL_RAM_GB=$(($TOTAL_RAM_KB / 1024 / 1024))
 CORES=$(nproc)
 
-echo -e "   [RAM]  Detected ${BOLD}${TOTAL_RAM_GB}GB${NC} System Memory."
-
 if [ $TOTAL_RAM_GB -ge 8 ]; then
-    echo -e "           -> Strategy: Standard Swapfile (4GB)."
     SWAP_SIZE=4
 else
-    echo -e "           -> Strategy: ${YELLOW}Low Memory.${NC} Swapfile increased to 8GB."
     SWAP_SIZE=8
 fi
 
@@ -388,20 +414,20 @@ while true; do
 
     case $STRATEGY_OPT in
         1)
-            echo -e "${ICON_INF} Scanning for unallocated space..."
+            # 1.5 Polish: OS Warning via fdisk output presence
+            if fdisk -l "$TARGET_DISK" | grep -E "NTFS|ext4|btrfs" &>/dev/null; then
+                 echo -e "${ICON_WRN} Existing OS/Data detected on disk."
+            fi
+
             if sgdisk -p "$TARGET_DISK" | grep -i "Total free space" | grep -q "0.0 B"; then
-                 echo -e "${ICON_ERR} No free space available on disk."
+                 echo -e "${ICON_ERR} No free space available."
                  exit 1
             fi
             
-            if [[ "$DRY_RUN" -eq 0 ]]; then
-                sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Root" "$TARGET_DISK" &>/dev/null
-                partprobe "$TARGET_DISK" && sync && sleep 2
-            else
-                echo -e "${ICON_DRY} Skipping partition creation."
-            fi
+            # 2.1 Edge-Case: Alignment (-a 2048)
+            run_safe sgdisk -a 2048 -n 0:0:0 -t 0:8304 -c 0:"Arch Root" "$TARGET_DISK"
+            [[ "$DRY_RUN" -eq 0 ]] && { partprobe "$TARGET_DISK" && sync && sleep 2; }
             
-            # 11. Edge-Case: NVMe namespace naming edge (Using lsblk path)
             ROOT_PART=$(lsblk -n -o PATH,PARTLABEL "$TARGET_DISK" | grep "Arch Root" | tail -n1 | awk '{print $1}')
             
             if [[ -z "$ROOT_PART" && "$DRY_RUN" -eq 0 ]]; then
@@ -411,29 +437,21 @@ while true; do
                  ROOT_PART="/dev/${ROOT_INPUT#/dev/}"
             elif [[ "$DRY_RUN" -eq 1 ]]; then
                  ROOT_PART="${TARGET_DISK}pX"
-                 echo -e "${ICON_DRY} Mock Root Partition: $ROOT_PART"
-            else
-                 echo -e "${ICON_OK} Auto-Detected New Partition: ${BOLD}$ROOT_PART${NC}"
             fi
             
-            # 10. Edge-Case: Multiple EFI partitions
+            # 10. Edge-Case: Multiple EFI detection
             mapfile -t EFI_LIST < <(fdisk -l | grep 'EFI System' | awk '{print $1}')
             
             if [ ${#EFI_LIST[@]} -eq 0 ]; then
-                echo -e "${ICON_ERR} No EFI Partition found. System requires EFI."
-                exit 1
+                fatal "No EFI Partition found."
             elif [ ${#EFI_LIST[@]} -eq 1 ]; then
                 EFI_PART=${EFI_LIST[0]}
-                echo -e "${ICON_OK} Detected Windows Boot Manager at ${BOLD}$EFI_PART${NC}"
             else
-                echo -e "${ICON_WRN} Multiple EFI Partitions Detected:"
-                for i in "${!EFI_LIST[@]}"; do
-                    echo "  $((i+1))) ${EFI_LIST[$i]}"
-                done
+                echo -e "${ICON_WRN} Multiple EFI Partitions:"
+                for i in "${!EFI_LIST[@]}"; do echo "  $((i+1))) ${EFI_LIST[$i]}"; done
                 ask_input "EFI_IDX" "Select EFI Partition Number"
                 EFI_PART=${EFI_LIST[$((EFI_IDX-1))]}
             fi
-            
             FORMAT_EFI="no"
             ;;
         2)
@@ -441,14 +459,11 @@ while true; do
             ask_input "CONFIRM" "Type 'DESTROY' to confirm"
             [[ "$CONFIRM" != "DESTROY" ]] && echo "Aborted." && exit 1
             
-            if [[ "$DRY_RUN" -eq 0 ]]; then
-                sgdisk -Z "$TARGET_DISK" &>/dev/null
-                sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI System" "$TARGET_DISK" &>/dev/null
-                sgdisk -n 2:0:0     -t 2:8304 -c 2:"Arch Root"  "$TARGET_DISK" &>/dev/null
-                partprobe "$TARGET_DISK" && sync && sleep 3
-            else
-                echo -e "${ICON_DRY} Skipping wipe and partition."
-            fi
+            # 2.1 Edge-Case: Alignment
+            run_safe sgdisk -Z "$TARGET_DISK"
+            run_safe sgdisk -a 2048 -n 1:0:+512M -t 1:ef00 -c 1:"EFI System" "$TARGET_DISK"
+            run_safe sgdisk -a 2048 -n 2:0:0     -t 2:8304 -c 2:"Arch Root"  "$TARGET_DISK"
+            [[ "$DRY_RUN" -eq 0 ]] && { partprobe "$TARGET_DISK" && sync && sleep 3; }
             
             if [[ "$TARGET_DISK" == *"nvme"* ]]; then
                 EFI_PART="${TARGET_DISK}p1"; ROOT_PART="${TARGET_DISK}p2"
@@ -461,10 +476,8 @@ while true; do
         3)
             echo -e "${ICON_INF} Launching cfdisk..."
             read -p "Press Enter to continue..."
-            if [[ "$DRY_RUN" -eq 0 ]]; then
-                cfdisk "$TARGET_DISK"
-                partprobe "$TARGET_DISK" && sync && sleep 3
-            fi
+            run_safe cfdisk "$TARGET_DISK"
+            [[ "$DRY_RUN" -eq 0 ]] && { partprobe "$TARGET_DISK" && sync && sleep 3; }
             
             echo -e "\n${CYAN}:: Partition Map ::${NC}"
             lsblk "$TARGET_DISK" -o NAME,SIZE,TYPE,FSTYPE,LABEL
@@ -472,62 +485,39 @@ while true; do
             ask_input "E_IN" "Select EFI Partition"
             EFI_PART="/dev/${E_IN#/dev/}"
             ask_input "FORMAT_EFI" "Format EFI? (yes/no)"
-            
-            if [[ "$FORMAT_EFI" == "yes" ]]; then
-                echo -e "${YELLOW}WARNING: Formatting EFI will delete all other bootloaders (Windows/Fedora)!${NC}"
-                ask_input "EFI_CONFIRM" "Are you sure?"
-                [[ "$EFI_CONFIRM" != "yes" ]] && FORMAT_EFI="no"
-            fi
+            [[ "$FORMAT_EFI" == "yes" ]] && echo -e "${YELLOW}WARNING: Deletes other bootloaders.${NC}"
             
             ask_input "R_IN" "Select Root Partition"
             ROOT_PART="/dev/${R_IN#/dev/}"
             break
             ;;
-        *)
-            echo "Invalid Option." ;;
+        *) echo "Invalid Option." ;;
     esac
 done
 
-if [[ "$DRY_RUN" -eq 0 ]]; then
-    if [ ! -b "$ROOT_PART" ] || [ ! -b "$EFI_PART" ]; then
-        echo -e "${ICON_ERR} Partition check failed. Defined partitions do not exist."
-        exit 1
-    fi
-fi
-
 echo -e "\n${GREEN}=== CONFIGURATION SUMMARY ===${NC}"
-# 7. Polish: Show disk model and size in confirmation
 DISK_MODEL=$(lsblk -dn -o MODEL "$TARGET_DISK")
 echo -e " Target Disk : ${WHITE}$TARGET_DISK ($DISK_MODEL)${NC}"
 echo -e " EFI Boot    : ${WHITE}$EFI_PART${NC} (Format: $FORMAT_EFI)"
-echo -e " System Root : ${WHITE}$ROOT_PART${NC} (Format: YES)"
-echo -e " Swap Size   : ${WHITE}${SWAP_SIZE}GB${NC}"
-echo -e " Cores       : ${WHITE}$CORES (Makeflags)${NC}"
+echo -e " System Root : ${WHITE}$ROOT_PART${NC}"
+echo -e " Swap Strategy: ${WHITE}${SWAP_SIZE}GB${NC}"
 echo -e "${GREEN}=============================${NC}"
 
-ask_input "CONFIRM" "Type 'yes' to proceed with installation"
-[[ "$CONFIRM" != "yes" ]] && exit 1
+# 1.4 Polish: Final confirmation timeout
+echo -e "\n${RED}${BOLD}Proceeding in 10 seconds... Ctrl+C to abort.${NC}"
+for i in {10..1}; do echo -ne "\rStarting in $i... "; sleep 1; done; echo ""
 
 # ==============================================================================
 # SECTION 5: INSTALLATION PROCESS
 # ==============================================================================
 start_step "5" "CORE INSTALLATION"
 
-# Connection Pulse Check
-echo -e "${ICON_INF} Verifying connection before download..."
-if ! ping -c 1 google.com &>/dev/null; then
-    echo -e "${ICON_ERR} Connection lost. Cannot proceed with download."
-    exit 1
-fi
-
-if [[ "$DRY_RUN" -eq 1 ]]; then
-    echo -e "${ICON_DRY} Stopping before destructive actions."
-    exit 0
-fi
+if ! check_internet; then fatal "Connection lost."; fi
+if [[ "$DRY_RUN" -eq 1 ]]; then echo -e "${ICON_DRY} Stopping before destructive actions."; exit 0; fi
 
 DISK_MODIFIED=1
 
-echo -e "${ICON_INF} Optimizing Pacman (Parallel Downloads)..."
+echo -e "${ICON_INF} Optimizing Pacman..."
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 
 echo -e "${ICON_INF} Formatting Filesystems..."
@@ -536,23 +526,15 @@ if [[ "$FORMAT_EFI" == "yes" ]]; then
     mkfs.vfat -F32 "$EFI_PART" &>/dev/null
 fi
 
-echo -e "${ICON_INF} Mounting Partitions..."
+echo -e "${ICON_INF} Mounting..."
 mount "$ROOT_PART" /mnt
 mkdir -p /mnt/boot/efi
 mount "$EFI_PART" /mnt/boot/efi
 
 echo -e "${ICON_INF} Detecting CPU..."
-if grep -q "AuthenticAMD" /proc/cpuinfo; then
-    UCODE="amd-ucode"
-    echo -e "${ICON_OK} AMD CPU Detected."
-else
-    UCODE="intel-ucode"
-    echo -e "${ICON_OK} Intel CPU Detected."
-fi
+if grep -q "AuthenticAMD" /proc/cpuinfo; then UCODE="amd-ucode"; else UCODE="intel-ucode"; fi
 
-echo -e "${ICON_INF} Installing Base System (Zen Kernel)..."
-echo -e "${DIM} (Logs available at /tmp/arch-install.log)${NC}"
-
+echo -e "${ICON_INF} Installing Base System..."
 pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
     "$UCODE" mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
     networkmanager bluez bluez-utils power-profiles-daemon \
@@ -560,31 +542,18 @@ pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
 
 INSTALL_PID=$!
 sleep 1
-if ! ps -p $INSTALL_PID > /dev/null; then
-    echo -e "\n${ICON_ERR} Pacstrap failed immediately. Check /tmp/arch-install.log"
-    exit 1
-fi
-
+if ! ps -p $INSTALL_PID > /dev/null; then fatal "Pacstrap failed. Check /tmp/arch-install.log"; fi
 show_progress_bar $INSTALL_PID
-
-wait $INSTALL_PID
-if [ $? -eq 0 ]; then
-    echo -e "${ICON_OK} Core packages installed."
-else
-    echo -e "\n${ICON_ERR} Installation Failed. Check /tmp/arch-install.log"
-    exit 1
-fi
+wait $INSTALL_PID || fatal "Installation Failed."
 
 echo -e "${ICON_INF} Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
 
-# 6. Polish: Versioned config summary saved for future reference
 cat > /mnt/etc/arch-installer.conf <<EOF
 INSTALL_DATE=$(date)
 HOSTNAME=$MY_HOSTNAME
 LOCALE=$LOCALE
 TIMEZONE=$TIMEZONE
-KERNEL=linux-zen
 EOF
 
 # ==============================================================================
@@ -594,11 +563,7 @@ start_step "6" "USER & SYSTEM CONFIGURATION"
 
 while true; do
     ask_input "MY_USER" "Enter Desired Username"
-    if [[ "$MY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
-        break
-    else
-        echo -e "${ICON_ERR} Invalid format. Use lowercase letters, numbers, _ or - only."
-    fi
+    if [[ "$MY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then break; else echo -e "${ICON_ERR} Invalid format."; fi
 done
 
 while true; do
@@ -609,27 +574,23 @@ while true; do
     [[ "$P1" == "$P2" && -n "$P1" ]] && MY_PASS="$P1" && break
     echo -e "${ICON_ERR} Passwords do not match."
 done
-echo ""
 
 export SWAP_SIZE CORES
 
-echo -e "${ICON_INF} Configuring System Internals..."
-
 arch-chroot /mnt /bin/bash <<EOF
+set -euo pipefail
 ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
 hwclock --systohc &>/dev/null
 
-# 1. Polish: Prevent duplicate locale entries
-if ! grep -q "^$LOCALE UTF-8" /etc/locale.gen; then
-    echo "$LOCALE UTF-8" >> /etc/locale.gen
-fi
+# 2.3 Edge-Case: Duplicate locale check
+grep -q "^$LOCALE UTF-8" /etc/locale.gen || echo "$LOCALE UTF-8" >> /etc/locale.gen
 locale-gen &>/dev/null
 echo "LANG=$LOCALE" > /etc/locale.conf
 echo "KEYMAP=$KEYMAP" > /etc/vconsole.conf
 echo "$MY_HOSTNAME" > /etc/hostname
 
 echo "root:$MY_PASS" | chpasswd
-useradd -m -G wheel,storage,power,video -s /bin/bash "$MY_USER"
+useradd -m -G wheel,storage,power,video -s /bin/bash "$MY_USER" || echo "User exists, skipping."
 echo "$MY_USER:$MY_PASS" | chpasswd
 
 echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/00_arch_installer
@@ -638,17 +599,12 @@ chmod 440 /etc/sudoers.d/00_arch_installer
 pacman -S --noconfirm grub efibootmgr os-prober &>/dev/null
 echo "GRUB_DISABLE_OS_PROBER=false" >> /etc/default/grub
 
-# 15. Edge-Case: Bootloader race sync
 sync; sleep 2
 grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=Arch &>/dev/null
 grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
 
-systemctl enable NetworkManager &>/dev/null
-systemctl enable power-profiles-daemon &>/dev/null
-systemctl enable bluetooth &>/dev/null
-systemctl enable fstrim.timer &>/dev/null
+systemctl enable NetworkManager power-profiles-daemon bluetooth fstrim.timer &>/dev/null
 
-# 2. Polish: Handle MAKEFLAGS whether commented or not
 if grep -q '^#MAKEFLAGS' /etc/makepkg.conf; then
     sed -i "s/^#MAKEFLAGS=.*/MAKEFLAGS=\"-j$CORES\"/" /etc/makepkg.conf
 elif grep -q '^MAKEFLAGS' /etc/makepkg.conf; then
@@ -657,10 +613,10 @@ else
     echo "MAKEFLAGS=\"-j$CORES\"" >> /etc/makepkg.conf
 fi
 
-# 9. Edge-Case: Check for Btrfs before creating swapfile
+# 2.6 Edge-Case: Btrfs Swap check
 FS_TYPE=\$(findmnt -n -o FSTYPE /)
 if [[ "\$FS_TYPE" == "btrfs" ]]; then
-    echo "Filesystem is Btrfs. Skipping standard swapfile creation (requires subvolume setup)."
+    echo "Filesystem is Btrfs. Skipping swapfile (requires NOCOW setup)."
 else
     if [ ! -f /swapfile ]; then
         dd if=/dev/zero of=/swapfile bs=1G count=$SWAP_SIZE status=none
@@ -668,36 +624,17 @@ else
         mkswap /swapfile &>/dev/null
     fi
     swapon /swapfile &>/dev/null
-    
-    # 3. Polish: Prevent duplicate fstab entries
-    if ! grep -q '^/swapfile' /etc/fstab; then
-        echo "/swapfile none swap defaults 0 0" >> /etc/fstab
-    fi
+    grep -q '^/swapfile' /etc/fstab || echo "/swapfile none swap defaults 0 0" >> /etc/fstab
 fi
-
-# Setup nano for user
-echo "set tabsize 4" > "/home/$MY_USER/.nanorc"
-echo "set tabstospaces" >> "/home/$MY_USER/.nanorc"
-chown "$MY_USER:$MY_USER" "/home/$MY_USER/.nanorc"
 EOF
 
 unset MY_PASS P1 P2
 DISK_MODIFIED=0
 
-# ==============================================================================
-# FINALIZATION
-# ==============================================================================
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${CYAN}${BOLD}    INSTALLATION SUCCESSFUL v2.7.0 ${NC}"
+echo -e "${CYAN}${BOLD}    INSTALLATION SUCCESSFUL v2.8.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e ""
-echo -e " 1. Remove installation media."
-echo -e " 2. Type ${BOLD}reboot${NC} to start your new system."
-echo -e " 3. Login as: ${BOLD}$MY_USER${NC}"
-# 16. Edge-Case: OS-Prober Note
-echo -e " 4. Note: OS-Prober is active (Dual Boot Ready)."
-echo -e ""
-echo -e "${DIM} Welcome to the Arch Linux family.${NC}"
-echo -e ""
+echo -e "\n 1. Type ${BOLD}reboot${NC} to start your new system."
+echo -e " 2. Login as: ${BOLD}$MY_USER${NC}\n"

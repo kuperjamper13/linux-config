@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v1.9.1
-#  Hotfix: Fixed Pacstrap Syntax | Performance Edition
+#  ARCH LINUX UNIVERSAL INSTALLER v2.0.0
+#  v1.9 Aesthetics | v1.5 Stability (Classic Engine)
 # ==============================================================================
 
 # --- [1] VISUAL LIBRARY -------------------------------------------------------
@@ -35,7 +35,7 @@ function print_banner {
     echo " ██║╚██╗   ██╔══██╗ ██║      ██╔══██║"
     echo " ██║ ╚██╗  ██║  ██║ ███████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝  ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.9.1"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.0.0"
     echo -e "${NC}"
 }
 
@@ -137,6 +137,7 @@ done
 
 # 2.3 Timezone
 echo -e "\n${ICON_INF} Select Timezone Region"
+# Grep excludes base dir to avoid empty option 1
 mapfile -t regions < <(find /usr/share/zoneinfo -maxdepth 1 -type d | cut -d/ -f5 | grep -vE "posix|right|Etc|SystemV|iso3166|Arctic|Antarctica|^$")
 print_menu_grid regions
 
@@ -266,6 +267,7 @@ while true; do
         1)
             # --- USE FREE SPACE ---
             echo -e "${ICON_INF} Scanning for unallocated space..."
+            # Execute logic from v1.6 (Robust Mode)
             sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Root" $TARGET_DISK &>/dev/null
 
             echo -e "${ICON_OK} Syncing Disk Map..."
@@ -355,20 +357,15 @@ ask_input "CONFIRM" "Type 'yes' to proceed with installation"
 [[ "$CONFIRM" != "yes" ]] && exit 1
 
 # ==============================================================================
-# SECTION 5: INSTALLATION PROCESS
+# SECTION 5: INSTALLATION PROCESS (CLASSIC V1.5 ENGINE)
 # ==============================================================================
 start_step "5" "CORE INSTALLATION"
 
-# 5.1 Optimization & Mirror Ranking
-echo -e "${ICON_INF} Optimizing Mirrors (Finding fastest servers)..."
-reflector --verbose --latest 5 --sort rate --save /etc/pacman.d/mirrorlist &>/dev/null
+# 5.1 Optimization
+echo -e "${ICON_INF} Optimizing Pacman (Parallel Downloads)..."
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 
-# 5.2 Keyring Fix (SILENT)
-echo -e "${ICON_INF} Refreshing Verification Keys (Silent)..."
-pacman -Sy --noconfirm archlinux-keyring &>/dev/null
-
-# 5.3 Formatting
+# 5.2 Formatting
 echo -e "${ICON_INF} Formatting Filesystems..."
 mkfs.ext4 -F $ROOT_PART &>/dev/null
 if [[ "$FORMAT_EFI" == "yes" ]]; then
@@ -378,13 +375,13 @@ else
     echo -e "${ICON_INF} Preserving existing EFI Data..."
 fi
 
-# 5.4 Mounting
+# 5.3 Mounting
 echo -e "${ICON_INF} Mounting Partitions to /mnt..."
 mount $ROOT_PART /mnt
 mkdir -p /mnt/boot
 mount $EFI_PART /mnt/boot
 
-# 5.5 CPU Detection
+# 5.4 CPU Detection
 echo -e "${ICON_INF} Detecting Processor Architecture..."
 if grep -q "AuthenticAMD" /proc/cpuinfo; then
     UCODE="amd-ucode"
@@ -394,15 +391,16 @@ else
     echo -e "${ICON_OK} Intel CPU Detected."
 fi
 
-# 5.6 Base Install
-echo -e "${ICON_INF} Downloading Base System..."
+# 5.5 Base Install (RESTORED V1.5 LOGIC - NO REFLECTOR, NO KEYRING)
+echo -e "${ICON_INF} Downloading and Installing Base System..."
 echo -e "${DIM} (Output visible to track progress)${NC}"
 
-# FIX: Removed invalid '--noconfirm' flag from pacstrap. It is default.
-pacstrap -K /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
+# Using the EXACT simple command from v1.5
+# But WITHOUT '&>/dev/null' so you can see it working
+pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
     $UCODE mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
     networkmanager bluez bluez-utils power-profiles-daemon \
-    git nano ntfs-3g dosfstools mtools || { echo -e "\n${ICON_ERR} Installation Failed."; exit 1; }
+    git nano ntfs-3g dosfstools mtools
 
 echo -e "\n${ICON_OK} Core packages installed."
 echo -e "${ICON_INF} Generating fstab..."
@@ -469,7 +467,7 @@ EOF
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.9.1 ${NC}"
+echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v2.0.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

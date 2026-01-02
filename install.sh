@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v2.6.0
-#  Zen Kernel (Restored) | Strict Mode | Arch Standard Paths (/boot/efi)
+#  ARCH LINUX UNIVERSAL INSTALLER v1.1.0
+#  Installing arch made easy.
 # ==============================================================================
 
 # --- [0] SAFETY PRE-FLIGHT ----------------------------------------------------
@@ -52,14 +52,13 @@ function hard_clear {
 
 function print_banner {
     echo -e "${MAGENTA}"
-    echo " ▄▄▄        ██████╗  ████████╗ ██╗  ██╗"
-    echo " ████╗      ██╔══██╗ ██╔═════╝ ██║  ██║"
-    echo " ██╔██╗     ██████╔╝ ██║       ███████║"
-    echo " ██║╚██╗    ██╔══██╗ ██║       ██╔══██║"
-    echo " ██║ ╚██╗   ██║  ██║ ████████╗ ██║  ██║"
-    echo " ╚═╝  ╚═╝   ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.6.0"
-    echo "  >> ZEN KERNEL + ARCH STANDARDS"
+    echo " ▄▄▄      ██████╗  ████████╗ ██╗  ██╗"
+    echo " ████╗    ██╔══██╗ ██╔═════╝ ██║  ██║"
+    echo " ██╔██╗   ██████╔╝ ██║       ███████║"
+    echo " ██║╚██╗  ██╔══██╗ ██║       ██╔══██║"
+    echo " ██║ ╚██╗ ██║  ██║ ████████╗ ██║  ██║"
+    echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.1.0"
     echo -e "${NC}"
 }
 

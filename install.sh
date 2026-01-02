@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v1.6.0
-#  Final Stable | Robust Error Handling | Clean UI
+#  ARCH LINUX UNIVERSAL INSTALLER v1.7.0
+#  Final Stable | Keyring Fix | Corrected ASCII
 # ==============================================================================
 
 # --- [1] VISUAL LIBRARY -------------------------------------------------------
@@ -35,7 +35,7 @@ function print_banner {
     echo " ██║╚██╗  ██╔══██╗ ██║      ██╔══██║"
     echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.0.0"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.7.0"
     echo -e "${NC}"
 }
 
@@ -250,7 +250,6 @@ fi
 # 4.3 Strategy Selection - LOOP for Error Handling
 while true; do
     echo -e "\n${ICON_INF} Select Partitioning Strategy"
-    # Vertical List as requested
     echo -e "  ${CYAN} 1)${NC} Use Free Space (Dual Boot Safe)"
     echo -e "  ${CYAN} 2)${NC} Wipe Entire Disk (Clean Install)"
     echo -e "  ${CYAN} 3)${NC} Manual Mode (Advanced)"
@@ -268,8 +267,7 @@ while true; do
             # --- USE FREE SPACE ---
             echo -e "${ICON_INF} Scanning for unallocated space..."
             
-            # Execute without trapping errors strictlly (Restored v1.4 logic)
-            # We allow sgdisk to complain but rely on partition creation success
+            # Execute without trapping errors strictlly
             sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Root" $TARGET_DISK &>/dev/null
 
             echo -e "${ICON_OK} Syncing Disk Map..."
@@ -367,7 +365,11 @@ start_step "5" "CORE INSTALLATION"
 echo -e "${ICON_INF} Optimizing Pacman (Parallel Downloads)..."
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 
-# 5.2 Formatting
+# 5.2 Keyring Fix (PREVENTS HANGS)
+echo -e "${ICON_INF} Refreshing Arch Keyring (Prevents Installation Hangs)..."
+pacman -Sy --noconfirm archlinux-keyring
+
+# 5.3 Formatting
 echo -e "${ICON_INF} Formatting Filesystems..."
 mkfs.ext4 -F $ROOT_PART &>/dev/null
 if [[ "$FORMAT_EFI" == "yes" ]]; then
@@ -377,13 +379,13 @@ else
     echo -e "${ICON_INF} Preserving existing EFI Data..."
 fi
 
-# 5.3 Mounting
+# 5.4 Mounting
 echo -e "${ICON_INF} Mounting Partitions to /mnt..."
 mount $ROOT_PART /mnt
 mkdir -p /mnt/boot
 mount $EFI_PART /mnt/boot
 
-# 5.4 CPU Detection
+# 5.5 CPU Detection
 echo -e "${ICON_INF} Detecting Processor Architecture..."
 if grep -q "AuthenticAMD" /proc/cpuinfo; then
     UCODE="amd-ucode"
@@ -393,7 +395,7 @@ else
     echo -e "${ICON_OK} Intel CPU Detected."
 fi
 
-# 5.5 Base Install
+# 5.6 Base Install
 echo -e "${ICON_INF} Downloading and Installing Base System (This may take time)..."
 pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
     $UCODE mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
@@ -465,7 +467,7 @@ EOF
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.6.0 ${NC}"
+echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.7.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

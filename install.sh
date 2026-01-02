@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v1.4.0
-#  Final Polish | Hard Reset UI | Robust Partitioning
+#  ARCH LINUX UNIVERSAL INSTALLER v1.5.0
+#  Final Stable | Robust Error Handling | Clean UI
 # ==============================================================================
 
 # --- [1] VISUAL LIBRARY -------------------------------------------------------
@@ -24,7 +24,6 @@ ICON_INF="[${CYAN} INFO ${NC}]"
 
 # --- [2] UI UTILITIES ---------------------------------------------------------
 function hard_clear {
-    # Forces a terminal reset to prevent "ghost text" from previous steps
     printf "\033c"
 }
 
@@ -36,7 +35,7 @@ function print_banner {
     echo " ██║╚██╗  ██╔══██╗ ██║      ██╔══██║"
     echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.0.0"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.5.0"
     echo -e "${NC}"
 }
 
@@ -78,10 +77,8 @@ function print_menu_grid {
         val2="${arr[$i+half]}"
         
         idx1=$((i+1))
-        # Column 1 (Widened to 25 chars)
         printf "  ${CYAN}%2d)${NC} %-25s" "$idx1" "$val1"
         
-        # Column 2
         if [[ -n "$val2" ]]; then
             idx2=$((i+half+1))
             printf "  ${CYAN}%2d)${NC} %-25s" "$idx2" "$val2"
@@ -140,7 +137,8 @@ done
 
 # 2.3 Timezone
 echo -e "\n${ICON_INF} Select Timezone Region"
-mapfile -t regions < <(find /usr/share/zoneinfo -maxdepth 1 -type d | cut -d/ -f5 | grep -vE "posix|right|Etc|SystemV|iso3166|Arctic|Antarctica")
+# FIX: Grep excludes the base directory to prevent empty first option
+mapfile -t regions < <(find /usr/share/zoneinfo -maxdepth 1 -type d | cut -d/ -f5 | grep -vE "posix|right|Etc|SystemV|iso3166|Arctic|Antarctica|^$")
 print_menu_grid regions
 
 while true; do
@@ -155,7 +153,6 @@ done
 
 echo -e "\n${ICON_INF} Select City in $REGION"
 mapfile -t cities < <(ls /usr/share/zoneinfo/$REGION)
-# Show top 20 to prevent scrolling mess
 short_cities=("${cities[@]:0:20}")
 print_menu_grid short_cities
 
@@ -251,87 +248,105 @@ else
     echo -e "          -> Strategy: ${YELLOW}Low Memory.${NC} Swapfile is critical."
 fi
 
-# 4.3 Strategy Selection
-echo -e "\n${ICON_INF} Select Partitioning Strategy"
-strategies=("Use Free Space (Dual Boot Safe)" "Wipe Entire Disk (Clean Install)" "Manual Mode (Advanced)")
-print_menu_grid strategies
+# 4.3 Strategy Selection - LOOP for Error Handling
+while true; do
+    echo -e "\n${ICON_INF} Select Partitioning Strategy"
+    strategies=("Use Free Space (Dual Boot Safe)" "Wipe Entire Disk (Clean Install)" "Manual Mode (Advanced)")
+    print_menu_grid strategies
 
-ask_input "STRATEGY_OPT" "Select Strategy Number"
+    ask_input "STRATEGY_OPT" "Select Strategy Number"
 
-case $STRATEGY_OPT in
-    1)
-        # --- USE FREE SPACE ---
-        echo -e "${ICON_INF} Scanning for unallocated space..."
-        sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Root" $TARGET_DISK
-        echo -e "${ICON_INF} Syncing Disk Map (Waiting 3s)..."
-        partprobe $TARGET_DISK && sync && sleep 3
-        
-        # Auto-Detect: Use PATH column to avoid spaces issue in names
-        ROOT_PART=$(lsblk -n -o PATH,PARTLABEL $TARGET_DISK | grep "Arch Root" | tail -n1 | awk '{print $1}')
-        
-        # Robust Fallback if Partprobe was too slow
-        if [[ -z "$ROOT_PART" ]]; then
-             echo -e "${ICON_WRN} Auto-detect needs confirmation."
-             echo -e "${ICON_INF} Current Partitions:"
-             lsblk $TARGET_DISK -o NAME,SIZE,TYPE,LABEL
-             ask_input "ROOT_INPUT" "Identify the new Partition (e.g. nvme0n1p3)"
-             ROOT_PART="/dev/${ROOT_INPUT#/dev/}"
-        else
-             echo -e "${ICON_OK} Auto-Detected New Partition: ${BOLD}$ROOT_PART${NC}"
-        fi
-        
-        # EFI Detection
-        AUTO_EFI=$(fdisk -l $TARGET_DISK | grep 'EFI System' | awk '{print $1}' | head -n 1)
-        if [[ -n "$AUTO_EFI" ]]; then
-            EFI_PART=$AUTO_EFI
-            FORMAT_EFI="no"
-            echo -e "${ICON_OK} Detected Windows Boot Manager at ${BOLD}$EFI_PART${NC}"
-        else
-            echo -e "${ICON_ERR} No EFI Partition found. System requires EFI."
-            exit 1
-        fi
-        ;;
-        
-    2)
-        # --- WIPE ALL ---
-        echo -e "\n${RED}${BOLD}CRITICAL WARNING: THIS WILL DESTROY ALL DATA ON $TARGET_DISK${NC}"
-        ask_input "CONFIRM" "Type 'DESTROY' to confirm"
-        [[ "$CONFIRM" != "DESTROY" ]] && echo "Aborted." && exit 1
-        
-        echo -e "${ICON_INF} Initializing Disk Surface..."
-        sgdisk -Z $TARGET_DISK &>/dev/null
-        sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI System" $TARGET_DISK &>/dev/null
-        sgdisk -n 2:0:0     -t 2:8304 -c 2:"Arch Root"  $TARGET_DISK &>/dev/null
-        partprobe $TARGET_DISK && sync && sleep 3
-        
-        if [[ "$TARGET_DISK" == *"nvme"* ]]; then
-            EFI_PART="${TARGET_DISK}p1"; ROOT_PART="${TARGET_DISK}p2"
-        else
-            EFI_PART="${TARGET_DISK}1"; ROOT_PART="${TARGET_DISK}2"
-        fi
-        FORMAT_EFI="yes"
-        ;;
-        
-    3)
-        # --- MANUAL ---
-        echo -e "${ICON_INF} Launching cfdisk..."
-        read -p "Press Enter to continue..."
-        cfdisk $TARGET_DISK
-        partprobe $TARGET_DISK && sync && sleep 3
-        
-        echo -e "\n${CYAN}:: Partition Map ::${NC}"
-        lsblk $TARGET_DISK -o NAME,SIZE,TYPE,FSTYPE,LABEL
-        
-        ask_input "E_IN" "Select EFI Partition"
-        EFI_PART="/dev/${E_IN#/dev/}"
-        ask_input "FORMAT_EFI" "Format EFI? (yes/no)"
-        
-        ask_input "R_IN" "Select Root Partition"
-        ROOT_PART="/dev/${R_IN#/dev/}"
-        ;;
-    *)
-        echo "Invalid Option." && exit 1 ;;
-esac
+    # Reset vars
+    ROOT_PART=""
+    EFI_PART=""
+    FORMAT_EFI="no"
+
+    case $STRATEGY_OPT in
+        1)
+            # --- USE FREE SPACE ---
+            echo -e "${ICON_INF} Scanning for unallocated space..."
+            
+            # Try to create partition. Check if sgdisk fails (e.g., no free space)
+            # Capture output to variable to suppress ugly errors, check exit code
+            SG_OUT=$(sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Root" $TARGET_DISK 2>&1)
+            SG_RET=$?
+            
+            if [ $SG_RET -ne 0 ]; then
+                echo -e "${ICON_ERR} ${RED}Auto-Partitioning Failed.${NC}"
+                echo -e "${DIM}Reason: No unallocated space found on $TARGET_DISK.${NC}"
+                echo -e "${DIM}Please free up space using Windows Disk Manager or use Manual Mode.${NC}"
+                continue # Return to strategy selection
+            fi
+
+            echo -e "${ICON_OK} Partition Created. Syncing Disk Map..."
+            partprobe $TARGET_DISK && sync && sleep 2
+            
+            ROOT_PART=$(lsblk -n -o PATH,PARTLABEL $TARGET_DISK | grep "Arch Root" | tail -n1 | awk '{print $1}')
+            
+            if [[ -z "$ROOT_PART" ]]; then
+                 echo -e "${ICON_WRN} Auto-detect failed. Please identify manually:"
+                 lsblk $TARGET_DISK -o NAME,SIZE,TYPE,LABEL
+                 ask_input "ROOT_INPUT" "Enter Root Partition Name (e.g. nvme0n1p3)"
+                 ROOT_PART="/dev/${ROOT_INPUT#/dev/}"
+            else
+                 echo -e "${ICON_OK} Auto-Detected New Partition: ${BOLD}$ROOT_PART${NC}"
+            fi
+            
+            AUTO_EFI=$(fdisk -l $TARGET_DISK | grep 'EFI System' | awk '{print $1}' | head -n 1)
+            if [[ -n "$AUTO_EFI" ]]; then
+                EFI_PART=$AUTO_EFI
+                FORMAT_EFI="no"
+                echo -e "${ICON_OK} Detected Windows Boot Manager at ${BOLD}$EFI_PART${NC}"
+                break
+            else
+                echo -e "${ICON_ERR} No EFI Partition found. System requires EFI."
+                exit 1
+            fi
+            ;;
+            
+        2)
+            # --- WIPE ALL ---
+            echo -e "\n${RED}${BOLD}CRITICAL WARNING: THIS WILL DESTROY ALL DATA ON $TARGET_DISK${NC}"
+            ask_input "CONFIRM" "Type 'DESTROY' to confirm"
+            [[ "$CONFIRM" != "DESTROY" ]] && echo "Aborted." && exit 1
+            
+            echo -e "${ICON_INF} Initializing Disk Surface..."
+            sgdisk -Z $TARGET_DISK &>/dev/null
+            sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI System" $TARGET_DISK &>/dev/null
+            sgdisk -n 2:0:0     -t 2:8304 -c 2:"Arch Root"  $TARGET_DISK &>/dev/null
+            partprobe $TARGET_DISK && sync && sleep 3
+            
+            if [[ "$TARGET_DISK" == *"nvme"* ]]; then
+                EFI_PART="${TARGET_DISK}p1"; ROOT_PART="${TARGET_DISK}p2"
+            else
+                EFI_PART="${TARGET_DISK}1"; ROOT_PART="${TARGET_DISK}2"
+            fi
+            FORMAT_EFI="yes"
+            break
+            ;;
+            
+        3)
+            # --- MANUAL ---
+            echo -e "${ICON_INF} Launching cfdisk..."
+            read -p "Press Enter to continue..."
+            cfdisk $TARGET_DISK
+            partprobe $TARGET_DISK && sync && sleep 3
+            
+            echo -e "\n${CYAN}:: Partition Map ::${NC}"
+            lsblk $TARGET_DISK -o NAME,SIZE,TYPE,FSTYPE,LABEL
+            
+            ask_input "E_IN" "Select EFI Partition"
+            EFI_PART="/dev/${E_IN#/dev/}"
+            ask_input "FORMAT_EFI" "Format EFI? (yes/no)"
+            
+            ask_input "R_IN" "Select Root Partition"
+            ROOT_PART="/dev/${R_IN#/dev/}"
+            break
+            ;;
+        *)
+            echo "Invalid Option." ;;
+    esac
+done
 
 # 4.5 Safety Verification
 if [ ! -b "$ROOT_PART" ] || [ ! -b "$EFI_PART" ]; then
@@ -455,7 +470,7 @@ EOF
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.4.0 ${NC}"
+echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.5.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

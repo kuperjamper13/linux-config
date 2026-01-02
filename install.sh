@@ -1,12 +1,15 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v1.1.0
-#  My first bash script for arch installation
+#  ARCH LINUX UNIVERSAL INSTALLER v2.1.0
+#  Diamond Hardened | Secure | Production Grade
 # ==============================================================================
 
 # --- [0] SAFETY PRE-FLIGHT ----------------------------------------------------
-# Ensure cursor is restored even if script crashes or user Ctrl+C
+# Strict Mode: Error on unset variables, fail on pipe errors
+set -uo pipefail
+
+# Trap: Restore cursor even if script crashes or user Ctrl+C
 trap 'tput cnorm; exit' EXIT
 
 # --- [1] VISUAL LIBRARY -------------------------------------------------------
@@ -33,13 +36,13 @@ function hard_clear {
 
 function print_banner {
     echo -e "${MAGENTA}"
-    echo " ▄▄▄      ██████╗  ███████╗ ██╗  ██╗"
-    echo " ████╗    ██╔══██╗ ██╔════╝ ██║  ██║"
-    echo " ██╔██╗   ██████╔╝ ██║      ███████║"
-    echo " ██║╚██╗  ██╔══██╗ ██║      ██╔══██║"
-    echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
-    echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.0.0"
+    echo " ▄▄▄        ██████╗  ████████╗ ██╗  ██╗"
+    echo " ████╗      ██╔══██╗ ██╔═════╝ ██║  ██║"
+    echo " ██╔██╗     ██████╔╝ ██║       ███████║"
+    echo " ██║╚██╗    ██╔══██╗ ██║       ██╔══██║"
+    echo " ██║ ╚██╗   ██║  ██║ ████████╗ ██║  ██║"
+    echo " ╚═╝  ╚═╝   ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.1.0"
     echo "  >> SECURITY HARDENED EDITION"
     echo -e "${NC}"
 }
@@ -54,9 +57,9 @@ function start_step {
 
 function ask_input {
     # SECURE INPUT: Replaced 'eval' with 'printf -v' to prevent code injection
-    local var_name=$1
-    local prompt_text=$2
-    local default_val=$3
+    local var_name="$1"
+    local prompt_text="$2"
+    local default_val="${3:-}"
     
     if [[ -n "$default_val" ]]; then
         echo -ne "${YELLOW}${BOLD} ➜ ${NC}${WHITE}$prompt_text${NC} [${DIM}$default_val${NC}]: "
@@ -80,7 +83,7 @@ function print_menu_grid {
     echo -e "${DIM} Available Options:${NC}"
     for (( i=0; i<half; i++ )); do
         val1="${arr[$i]}"
-        val2="${arr[$i+half]}"
+        val2="${arr[$i+half]:-}"
         
         idx1=$((i+1))
         printf "  ${CYAN}%2d)${NC} %-25s" "$idx1" "$val1"
@@ -105,7 +108,7 @@ function show_progress_bar {
     tput civis
     echo -ne "\n  ${BOLD}Installing:${NC} ["
     
-    while ps -p $pid > /dev/null; do
+    while ps -p "$pid" > /dev/null; do
         local bar=""
         for ((j=0; j<width; j++)); do
             if [ $j -eq $i ]; then bar+="<=>"; else bar+=" "; fi
@@ -186,7 +189,7 @@ while true; do
 done
 
 echo -e "\n${ICON_INF} Select City in $REGION"
-mapfile -t cities < <(ls /usr/share/zoneinfo/$REGION)
+mapfile -t cities < <(ls "/usr/share/zoneinfo/$REGION")
 short_cities=("${cities[@]:0:20}")
 print_menu_grid short_cities
 
@@ -198,7 +201,7 @@ while true; do
         CITY="$CITY_INPUT"
     fi
     
-    # SECURITY FIX: Validate Timezone Exists
+    # HARDENED FIX: Validate Timezone Exists to prevent bad symlink
     if [ -f "/usr/share/zoneinfo/$REGION/$CITY" ]; then
         TIMEZONE="$REGION/$CITY"
         echo -e "${ICON_OK} Timezone set to: ${BOLD}$TIMEZONE${NC}"
@@ -214,47 +217,51 @@ sleep 1
 # ==============================================================================
 start_step "3" "NETWORK CONNECTIVITY CHECK"
 
-if ping -c 1 google.com &> /dev/null; then
-    echo -e "${ICON_OK} Internet Connection: ${GREEN}Active${NC}"
-else
-    echo -e "${ICON_ERR} Internet Connection: ${RED}Offline${NC}"
-    echo -e "${DIM}Initializing Wireless Interface...${NC}"
-    
-    # HARDENED FIX: Use 'iw dev' instead of 'ip link' for reliable wifi detection
-    WIFI_INTERFACE=$(iw dev | awk '$1=="Interface"{print $2; exit}')
-    
-    if [[ -z "$WIFI_INTERFACE" ]]; then
-        echo -e "${ICON_ERR} No Wireless Interface found."
+# '|| true' allows script to continue if ping fails (Strict Mode safety)
+if ping -c 1 google.com &> /dev/null || true; then
+    # Double check return code
+    if ping -c 1 google.com &> /dev/null; then
+        echo -e "${ICON_OK} Internet Connection: ${GREEN}Active${NC}"
     else
-        echo -e "${ICON_INF} Scanning on Interface: ${BOLD}$WIFI_INTERFACE${NC}"
-        iwctl station $WIFI_INTERFACE scan
+        echo -e "${ICON_ERR} Internet Connection: ${RED}Offline${NC}"
+        echo -e "${DIM}Initializing Wireless Interface...${NC}"
         
-        echo -e "\n${CYAN}:: Available Networks ::${NC}"
-        iwctl station $WIFI_INTERFACE get-networks
-        echo ""
-    
-        while true; do
-            echo -e "${ICON_ASK} WiFi Authentication Required"
-            ask_input "WIFI_SSID" "SSID Name"
+        # HARDENED FIX: Use 'iw dev' to ignore docker/veth interfaces
+        WIFI_INTERFACE=$(iw dev | awk '$1=="Interface"{print $2; exit}')
+        
+        if [[ -z "$WIFI_INTERFACE" ]]; then
+            echo -e "${ICON_ERR} No Wireless Interface found."
+        else
+            echo -e "${ICON_INF} Scanning on Interface: ${BOLD}$WIFI_INTERFACE${NC}"
+            iwctl station "$WIFI_INTERFACE" scan
             
-            echo -ne "${YELLOW}${BOLD} ➜ ${NC}${WHITE}Password${NC}: "
-            read -s WIFI_PASS
+            echo -e "\n${CYAN}:: Available Networks ::${NC}"
+            iwctl station "$WIFI_INTERFACE" get-networks
             echo ""
-            
-            echo -e "${ICON_INF} Authenticating with ${BOLD}$WIFI_SSID${NC}..."
-            iwctl --passphrase "$WIFI_PASS" station $WIFI_INTERFACE connect "$WIFI_SSID"
-            
-            echo -e "${ICON_INF} Verifying Handshake (8s timeout)..."
-            sleep 8
-            
-            if ping -c 1 google.com &> /dev/null; then
-                echo -e "${ICON_OK} ${GREEN}Connection Established Successfully.${NC}"
-                timedatectl set-ntp true
-                break
-            else
-                echo -e "${ICON_ERR} ${RED}Connection Failed.${NC}"
-            fi
-        done
+        
+            while true; do
+                echo -e "${ICON_ASK} WiFi Authentication Required"
+                ask_input "WIFI_SSID" "SSID Name"
+                
+                echo -ne "${YELLOW}${BOLD} ➜ ${NC}${WHITE}Password${NC}: "
+                read -s WIFI_PASS
+                echo ""
+                
+                echo -e "${ICON_INF} Authenticating with ${BOLD}$WIFI_SSID${NC}..."
+                iwctl --passphrase "$WIFI_PASS" station "$WIFI_INTERFACE" connect "$WIFI_SSID"
+                
+                echo -e "${ICON_INF} Verifying Handshake (8s timeout)..."
+                sleep 8
+                
+                if ping -c 1 google.com &> /dev/null; then
+                    echo -e "${ICON_OK} ${GREEN}Connection Established Successfully.${NC}"
+                    timedatectl set-ntp true
+                    break
+                else
+                    echo -e "${ICON_ERR} ${RED}Connection Failed.${NC}"
+                fi
+            done
+        fi
     fi
 fi
 sleep 1
@@ -308,21 +315,21 @@ while true; do
     case $STRATEGY_OPT in
         1)
             echo -e "${ICON_INF} Scanning for unallocated space..."
-            sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Root" $TARGET_DISK &>/dev/null
-            partprobe $TARGET_DISK && sync && sleep 2
+            sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Root" "$TARGET_DISK" &>/dev/null
+            partprobe "$TARGET_DISK" && sync && sleep 2
             
-            ROOT_PART=$(lsblk -n -o PATH,PARTLABEL $TARGET_DISK | grep "Arch Root" | tail -n1 | awk '{print $1}')
+            ROOT_PART=$(lsblk -n -o PATH,PARTLABEL "$TARGET_DISK" | grep "Arch Root" | tail -n1 | awk '{print $1}')
             
             if [[ -z "$ROOT_PART" ]]; then
                  echo -e "${ICON_WRN} Auto-detect needs confirmation."
-                 lsblk $TARGET_DISK -o NAME,SIZE,TYPE,LABEL
+                 lsblk "$TARGET_DISK" -o NAME,SIZE,TYPE,LABEL
                  ask_input "ROOT_INPUT" "Identify the new Partition (e.g. nvme0n1p3)"
                  ROOT_PART="/dev/${ROOT_INPUT#/dev/}"
             else
                  echo -e "${ICON_OK} Auto-Detected New Partition: ${BOLD}$ROOT_PART${NC}"
             fi
             
-            AUTO_EFI=$(fdisk -l $TARGET_DISK | grep 'EFI System' | awk '{print $1}' | head -n 1)
+            AUTO_EFI=$(fdisk -l "$TARGET_DISK" | grep 'EFI System' | awk '{print $1}' | head -n 1)
             if [[ -n "$AUTO_EFI" ]]; then
                 EFI_PART=$AUTO_EFI
                 FORMAT_EFI="no"
@@ -338,10 +345,10 @@ while true; do
             ask_input "CONFIRM" "Type 'DESTROY' to confirm"
             [[ "$CONFIRM" != "DESTROY" ]] && echo "Aborted." && exit 1
             
-            sgdisk -Z $TARGET_DISK &>/dev/null
-            sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI System" $TARGET_DISK &>/dev/null
-            sgdisk -n 2:0:0     -t 2:8304 -c 2:"Arch Root"  $TARGET_DISK &>/dev/null
-            partprobe $TARGET_DISK && sync && sleep 3
+            sgdisk -Z "$TARGET_DISK" &>/dev/null
+            sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI System" "$TARGET_DISK" &>/dev/null
+            sgdisk -n 2:0:0     -t 2:8304 -c 2:"Arch Root"  "$TARGET_DISK" &>/dev/null
+            partprobe "$TARGET_DISK" && sync && sleep 3
             
             if [[ "$TARGET_DISK" == *"nvme"* ]]; then
                 EFI_PART="${TARGET_DISK}p1"; ROOT_PART="${TARGET_DISK}p2"
@@ -354,11 +361,11 @@ while true; do
         3)
             echo -e "${ICON_INF} Launching cfdisk..."
             read -p "Press Enter to continue..."
-            cfdisk $TARGET_DISK
-            partprobe $TARGET_DISK && sync && sleep 3
+            cfdisk "$TARGET_DISK"
+            partprobe "$TARGET_DISK" && sync && sleep 3
             
             echo -e "\n${CYAN}:: Partition Map ::${NC}"
-            lsblk $TARGET_DISK -o NAME,SIZE,TYPE,FSTYPE,LABEL
+            lsblk "$TARGET_DISK" -o NAME,SIZE,TYPE,FSTYPE,LABEL
             
             ask_input "E_IN" "Select EFI Partition"
             EFI_PART="/dev/${E_IN#/dev/}"
@@ -395,15 +402,15 @@ echo -e "${ICON_INF} Optimizing Pacman (Parallel Downloads)..."
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 
 echo -e "${ICON_INF} Formatting Filesystems..."
-mkfs.ext4 -F $ROOT_PART &>/dev/null
+mkfs.ext4 -F "$ROOT_PART" &>/dev/null
 if [[ "$FORMAT_EFI" == "yes" ]]; then
-    mkfs.vfat -F32 $EFI_PART &>/dev/null
+    mkfs.vfat -F32 "$EFI_PART" &>/dev/null
 fi
 
 echo -e "${ICON_INF} Mounting Partitions..."
-mount $ROOT_PART /mnt
+mount "$ROOT_PART" /mnt
 mkdir -p /mnt/boot
-mount $EFI_PART /mnt/boot
+mount "$EFI_PART" /mnt/boot
 
 echo -e "${ICON_INF} Detecting CPU..."
 if grep -q "AuthenticAMD" /proc/cpuinfo; then
@@ -417,8 +424,9 @@ fi
 echo -e "${ICON_INF} Installing Base System..."
 echo -e "${DIM} (Logs available at /tmp/arch-install.log)${NC}"
 
-pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
-    $UCODE mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
+# Switch to standard 'linux' kernel for maximum compatibility/stability
+pacstrap /mnt base linux linux-headers linux-firmware base-devel \
+    "$UCODE" mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
     networkmanager bluez bluez-utils power-profiles-daemon \
     git nano ntfs-3g dosfstools mtools &> /tmp/arch-install.log &
 
@@ -441,7 +449,16 @@ genfstab -U /mnt >> /mnt/etc/fstab
 # ==============================================================================
 start_step "6" "USER & SYSTEM CONFIGURATION"
 
-ask_input "MY_USER" "Enter Desired Username"
+# HARDENED FIX: Username Validation Loop
+while true; do
+    ask_input "MY_USER" "Enter Desired Username"
+    if [[ "$MY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+        break
+    else
+        echo -e "${ICON_ERR} Invalid format. Use lowercase letters, numbers, _ or - only."
+    fi
+done
+
 while true; do
     echo -ne "${YELLOW}${BOLD} ➜ ${NC}${WHITE}Password${NC}: "
     read -s P1; echo
@@ -451,9 +468,6 @@ while true; do
     echo -e "${ICON_ERR} Passwords do not match."
 done
 echo ""
-
-# SECURITY FIX: Variables are not exported to prevent leaks
-# They are expanded directly into the heredoc below
 
 echo -e "${ICON_INF} Configuring System Internals..."
 
@@ -500,13 +514,16 @@ echo "set tabstospaces" >> /home/$MY_USER/.nanorc
 chown $MY_USER:$MY_USER /home/$MY_USER/.nanorc
 EOF
 
+# HARDENED FIX: Clear secrets from memory
+unset MY_PASS P1 P2
+
 # ==============================================================================
 # FINALIZATION
 # ==============================================================================
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${WHITE}${BOLD}   INSTALLATION SUCCESSFUL v2.0.0 ${NC}"
+echo -e "${WHITE}${BOLD}   INSTALLATION SUCCESSFUL v2.1.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

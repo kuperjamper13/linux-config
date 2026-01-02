@@ -1,9 +1,23 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v1.0.0
-#  First Release | Clean UI | Perfected Animations | High Performance
+#  ARCH LINUX UNIVERSAL INSTALLER v2.5.0 (Hybrid Fix)
+#  v1.0.3 Logic (Stable) + v2.4 UI + Safety Checks
 # ==============================================================================
+
+# --- [0] SAFETY PRE-FLIGHT ----------------------------------------------------
+# Global State for Trap
+DISK_MODIFIED=0
+
+cleanup() {
+    tput cnorm
+    if [[ "$DISK_MODIFIED" -eq 1 ]]; then
+        echo -e "\n${YELLOW} WARN ${NC} Script stopped after disk modification."
+        # Attempt to unmount if script crashes
+        umount -R /mnt &>/dev/null
+    fi
+}
+trap cleanup EXIT
 
 # --- [1] VISUAL LIBRARY -------------------------------------------------------
 NC='\033[0m'
@@ -35,7 +49,7 @@ function print_banner {
     echo " ██║╚██╗  ██╔══██╗ ██║      ██╔══██║"
     echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.0.3"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.5.0"
     echo -e "${NC}"
 }
 
@@ -48,9 +62,9 @@ function start_step {
 }
 
 function ask_input {
-    local var_name=$1
-    local prompt_text=$2
-    local default_val=$3
+    local var_name="$1"
+    local prompt_text="$2"
+    local default_val="${3:-}"
     
     if [[ -n "$default_val" ]]; then
         echo -ne "${YELLOW}${BOLD} ➜ ${NC}${WHITE}$prompt_text${NC} [${DIM}$default_val${NC}]: "
@@ -60,9 +74,9 @@ function ask_input {
     read -r input_val
     
     if [[ -z "$input_val" && -n "$default_val" ]]; then
-        eval $var_name="'$default_val'"
+        printf -v "$var_name" '%s' "$default_val"
     else
-        eval $var_name="'$input_val'"
+        printf -v "$var_name" '%s' "$input_val"
     fi
 }
 
@@ -74,7 +88,7 @@ function print_menu_grid {
     echo -e "${DIM} Available Options:${NC}"
     for (( i=0; i<half; i++ )); do
         val1="${arr[$i]}"
-        val2="${arr[$i+half]}"
+        val2="${arr[$i+half]:-}"
         
         idx1=$((i+1))
         printf "  ${CYAN}%2d)${NC} %-25s" "$idx1" "$val1"
@@ -90,48 +104,30 @@ function print_menu_grid {
 
 # --- [3] ANIMATION UTILITIES --------------------------------------------------
 function show_progress_bar {
-    # Displays an indeterminate "bouncer" progress bar while PID is running
     local pid=$1
     local delay=0.1
     local width=30
     local i=0
     local direction=1
     
-    # Hide cursor
     tput civis
-    
     echo -ne "\n  ${BOLD}Installing:${NC} ["
     
-    while ps -p $pid > /dev/null; do
-        # Build the bouncing arrow
+    while ps -p "$pid" > /dev/null; do
         local bar=""
         for ((j=0; j<width; j++)); do
-            if [ $j -eq $i ]; then
-                bar+="<=>"
-            else
-                bar+=" "
-            fi
+            if [ $j -eq $i ]; then bar+="<=>"; else bar+=" "; fi
         done
-        
-        # Print the bar (using \r to overwrite line)
-        # Using substring to keep bar length fixed
         printf "\r  ${BOLD}Installing:${NC} [${CYAN}%-${width}s${NC}]" "${bar:0:$width}"
         
-        # Move the bouncer
         i=$((i + direction))
-        if [ $i -ge $((width - 3)) ] || [ $i -le 0 ]; then
-            direction=$((direction * -1))
-        fi
-        
+        if [ $i -ge $((width - 3)) ] || [ $i -le 0 ]; then direction=$((direction * -1)); fi
         sleep $delay
     done
     
-    # FINISHED STATE: Fill with Cyan and add "Done"
-    # Generates a string of '=' characters exactly 'width' long
     local full_bar=$(printf '=%0.s' $(seq 1 $width))
     printf "\r  ${BOLD}Installing:${NC} [${CYAN}$full_bar${NC}] Done\n"
-    
-    # Restore cursor
+    sleep 1
     tput cnorm
 }
 
@@ -184,7 +180,7 @@ done
 
 # 2.3 Timezone
 echo -e "\n${ICON_INF} Select Timezone Region"
-mapfile -t regions < <(find /usr/share/zoneinfo -maxdepth 1 -type d | cut -d/ -f5 | grep -vE "posix|right|Etc|SystemV|iso3166|Arctic|Antarctica|^$")
+mapfile -t regions < <(find /usr/share/zoneinfo -maxdepth 1 -type d | cut -d/ -f5 | grep -vE "posix|right|Etc|SystemV|iso3166|Arctic|Antarctica|^$" | sort)
 print_menu_grid regions
 
 while true; do
@@ -198,19 +194,26 @@ while true; do
 done
 
 echo -e "\n${ICON_INF} Select City in $REGION"
-mapfile -t cities < <(ls /usr/share/zoneinfo/$REGION)
+mapfile -t cities < <(ls "/usr/share/zoneinfo/$REGION")
 short_cities=("${cities[@]:0:20}")
 print_menu_grid short_cities
 
-ask_input "CITY_INPUT" "Select Number OR Type Name"
-if [[ "$CITY_INPUT" =~ ^[0-9]+$ ]] && [ "$CITY_INPUT" -ge 1 ] && [ "$CITY_INPUT" -le "${#short_cities[@]}" ]; then
-    CITY="${short_cities[$((CITY_INPUT-1))]}"
-else
-    CITY="$CITY_INPUT"
-fi
-
-TIMEZONE="$REGION/$CITY"
-echo -e "${ICON_OK} Timezone set to: ${BOLD}$TIMEZONE${NC}"
+while true; do
+    ask_input "CITY_INPUT" "Select Number OR Type Name"
+    if [[ "$CITY_INPUT" =~ ^[0-9]+$ ]] && [ "$CITY_INPUT" -ge 1 ] && [ "$CITY_INPUT" -le "${#short_cities[@]}" ]; then
+        CITY="${short_cities[$((CITY_INPUT-1))]}"
+    else
+        CITY="$CITY_INPUT"
+    fi
+    
+    if [ -f "/usr/share/zoneinfo/$REGION/$CITY" ]; then
+        TIMEZONE="$REGION/$CITY"
+        echo -e "${ICON_OK} Timezone set to: ${BOLD}$TIMEZONE${NC}"
+        break
+    else
+        echo -e "${ICON_ERR} Invalid Timezone: $REGION/$CITY does not exist."
+    fi
+done
 sleep 1
 
 # ==============================================================================
@@ -224,38 +227,41 @@ else
     echo -e "${ICON_ERR} Internet Connection: ${RED}Offline${NC}"
     echo -e "${DIM}Initializing Wireless Interface...${NC}"
     
-    WIFI_INTERFACE=$(ip link | awk -F: '$0 !~ "lo|vir|eth" {print $2;getline}' | head -n 1 | tr -d ' ')
+    WIFI_INTERFACE=$(iw dev | awk '$1=="Interface"{print $2; exit}')
     
-    echo -e "${ICON_INF} Scanning on Interface: ${BOLD}$WIFI_INTERFACE${NC}"
-    iwctl station $WIFI_INTERFACE scan
-    
-    echo -e "\n${CYAN}:: Available Networks ::${NC}"
-    iwctl station $WIFI_INTERFACE get-networks
-    echo ""
-
-    while true; do
-        echo -e "${ICON_ASK} WiFi Authentication Required"
-        ask_input "WIFI_SSID" "SSID Name"
+    if [[ -z "$WIFI_INTERFACE" ]]; then
+        echo -e "${ICON_ERR} No Wireless Interface found."
+    else
+        echo -e "${ICON_INF} Scanning on Interface: ${BOLD}$WIFI_INTERFACE${NC}"
+        iwctl station "$WIFI_INTERFACE" scan
         
-        echo -ne "${YELLOW}${BOLD} ➜ ${NC}${WHITE}Password${NC}: "
-        read -s WIFI_PASS
+        echo -e "\n${CYAN}:: Available Networks ::${NC}"
+        iwctl station "$WIFI_INTERFACE" get-networks
         echo ""
-        
-        echo -e "${ICON_INF} Authenticating with ${BOLD}$WIFI_SSID${NC}..."
-        iwctl --passphrase "$WIFI_PASS" station $WIFI_INTERFACE connect "$WIFI_SSID"
-        
-        echo -e "${ICON_INF} Verifying Handshake (8s timeout)..."
-        sleep 8
-        
-        if ping -c 1 google.com &> /dev/null; then
-            echo -e "${ICON_OK} ${GREEN}Connection Established Successfully.${NC}"
-            timedatectl set-ntp true
-            break
-        else
-            echo -e "${ICON_ERR} ${RED}Connection Failed.${NC}"
-            echo -e "${DIM}Retrying authentication sequence...${NC}\n"
-        fi
-    done
+    
+        while true; do
+            echo -e "${ICON_ASK} WiFi Authentication Required"
+            ask_input "WIFI_SSID" "SSID Name"
+            
+            echo -ne "${YELLOW}${BOLD} ➜ ${NC}${WHITE}Password${NC}: "
+            read -s WIFI_PASS
+            echo ""
+            
+            echo -e "${ICON_INF} Authenticating with ${BOLD}$WIFI_SSID${NC}..."
+            iwctl --passphrase "$WIFI_PASS" station "$WIFI_INTERFACE" connect "$WIFI_SSID"
+            
+            echo -e "${ICON_INF} Verifying Handshake (8s timeout)..."
+            sleep 8
+            
+            if ping -c 1 google.com &> /dev/null; then
+                echo -e "${ICON_OK} ${GREEN}Connection Established Successfully.${NC}"
+                timedatectl set-ntp true
+                break
+            else
+                echo -e "${ICON_ERR} ${RED}Connection Failed.${NC}"
+            fi
+        done
+    fi
 fi
 sleep 1
 
@@ -264,7 +270,6 @@ sleep 1
 # ==============================================================================
 start_step "4" "STORAGE ARCHITECTURE"
 
-# 4.1 Drive Selection
 echo -e "${ICON_INF} Detected Storage Devices:"
 lsblk -d -n -o NAME,SIZE,MODEL,TYPE | grep 'disk' | awk '{print "    • /dev/" $1 " [" $2 "] " $3}'
 echo ""
@@ -282,19 +287,20 @@ while true; do
     fi
 done
 
-# 4.2 Hardware Analysis
 echo -e "\n${ICON_INF} Running Hardware Analysis..."
 TOTAL_RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
 TOTAL_RAM_GB=$(($TOTAL_RAM_KB / 1024 / 1024))
 
 echo -e "   [RAM]  Detected ${BOLD}${TOTAL_RAM_GB}GB${NC} System Memory."
+
 if [ $TOTAL_RAM_GB -ge 8 ]; then
     echo -e "          -> Strategy: Standard Swapfile (4GB)."
+    SWAP_SIZE=4
 else
-    echo -e "          -> Strategy: ${YELLOW}Low Memory.${NC} Swapfile is critical."
+    echo -e "          -> Strategy: ${YELLOW}Low Memory.${NC} Swapfile increased to 8GB."
+    SWAP_SIZE=8
 fi
 
-# 4.3 Strategy Selection
 while true; do
     echo -e "\n${ICON_INF} Select Partitioning Strategy"
     echo -e "  ${CYAN} 1)${NC} Use Free Space (Dual Boot Safe)"
@@ -304,33 +310,28 @@ while true; do
 
     ask_input "STRATEGY_OPT" "Select Strategy Number"
 
-    # Reset vars
     ROOT_PART=""
     EFI_PART=""
     FORMAT_EFI="no"
 
     case $STRATEGY_OPT in
         1)
-            # --- USE FREE SPACE ---
             echo -e "${ICON_INF} Scanning for unallocated space..."
-            sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Root" $TARGET_DISK &>/dev/null
-
-            echo -e "${ICON_OK} Syncing Disk Map..."
-            partprobe $TARGET_DISK && sync && sleep 2
+            sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Root" "$TARGET_DISK" &>/dev/null
+            partprobe "$TARGET_DISK" && sync && sleep 2
             
-            ROOT_PART=$(lsblk -n -o PATH,PARTLABEL $TARGET_DISK | grep "Arch Root" | tail -n1 | awk '{print $1}')
+            ROOT_PART=$(lsblk -n -o PATH,PARTLABEL "$TARGET_DISK" | grep "Arch Root" | tail -n1 | awk '{print $1}')
             
             if [[ -z "$ROOT_PART" ]]; then
                  echo -e "${ICON_WRN} Auto-detect needs confirmation."
-                 echo -e "${ICON_INF} Current Partitions:"
-                 lsblk $TARGET_DISK -o NAME,SIZE,TYPE,LABEL
+                 lsblk "$TARGET_DISK" -o NAME,SIZE,TYPE,LABEL
                  ask_input "ROOT_INPUT" "Identify the new Partition (e.g. nvme0n1p3)"
                  ROOT_PART="/dev/${ROOT_INPUT#/dev/}"
             else
                  echo -e "${ICON_OK} Auto-Detected New Partition: ${BOLD}$ROOT_PART${NC}"
             fi
             
-            AUTO_EFI=$(fdisk -l $TARGET_DISK | grep 'EFI System' | awk '{print $1}' | head -n 1)
+            AUTO_EFI=$(fdisk -l "$TARGET_DISK" | grep 'EFI System' | awk '{print $1}' | head -n 1)
             if [[ -n "$AUTO_EFI" ]]; then
                 EFI_PART=$AUTO_EFI
                 FORMAT_EFI="no"
@@ -341,18 +342,15 @@ while true; do
                 exit 1
             fi
             ;;
-            
         2)
-            # --- WIPE ALL ---
             echo -e "\n${RED}${BOLD}CRITICAL WARNING: THIS WILL DESTROY ALL DATA ON $TARGET_DISK${NC}"
             ask_input "CONFIRM" "Type 'DESTROY' to confirm"
             [[ "$CONFIRM" != "DESTROY" ]] && echo "Aborted." && exit 1
             
-            echo -e "${ICON_INF} Initializing Disk Surface..."
-            sgdisk -Z $TARGET_DISK &>/dev/null
-            sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI System" $TARGET_DISK &>/dev/null
-            sgdisk -n 2:0:0     -t 2:8304 -c 2:"Arch Root"  $TARGET_DISK &>/dev/null
-            partprobe $TARGET_DISK && sync && sleep 3
+            sgdisk -Z "$TARGET_DISK" &>/dev/null
+            sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI System" "$TARGET_DISK" &>/dev/null
+            sgdisk -n 2:0:0     -t 2:8304 -c 2:"Arch Root"  "$TARGET_DISK" &>/dev/null
+            partprobe "$TARGET_DISK" && sync && sleep 3
             
             if [[ "$TARGET_DISK" == *"nvme"* ]]; then
                 EFI_PART="${TARGET_DISK}p1"; ROOT_PART="${TARGET_DISK}p2"
@@ -362,20 +360,24 @@ while true; do
             FORMAT_EFI="yes"
             break
             ;;
-            
         3)
-            # --- MANUAL ---
             echo -e "${ICON_INF} Launching cfdisk..."
             read -p "Press Enter to continue..."
-            cfdisk $TARGET_DISK
-            partprobe $TARGET_DISK && sync && sleep 3
+            cfdisk "$TARGET_DISK"
+            partprobe "$TARGET_DISK" && sync && sleep 3
             
             echo -e "\n${CYAN}:: Partition Map ::${NC}"
-            lsblk $TARGET_DISK -o NAME,SIZE,TYPE,FSTYPE,LABEL
+            lsblk "$TARGET_DISK" -o NAME,SIZE,TYPE,FSTYPE,LABEL
             
             ask_input "E_IN" "Select EFI Partition"
             EFI_PART="/dev/${E_IN#/dev/}"
             ask_input "FORMAT_EFI" "Format EFI? (yes/no)"
+            
+            if [[ "$FORMAT_EFI" == "yes" ]]; then
+                echo -e "${YELLOW}WARNING: Formatting EFI will delete all other bootloaders (Windows/Fedora)!${NC}"
+                ask_input "EFI_CONFIRM" "Are you sure?"
+                [[ "$EFI_CONFIRM" != "yes" ]] && FORMAT_EFI="no"
+            fi
             
             ask_input "R_IN" "Select Root Partition"
             ROOT_PART="/dev/${R_IN#/dev/}"
@@ -386,7 +388,6 @@ while true; do
     esac
 done
 
-# 4.5 Safety Verification
 if [ ! -b "$ROOT_PART" ] || [ ! -b "$EFI_PART" ]; then
     echo -e "${ICON_ERR} Partition check failed. Defined partitions do not exist."
     exit 1
@@ -396,6 +397,7 @@ echo -e "\n${GREEN}=== CONFIGURATION SUMMARY ===${NC}"
 echo -e " Target Disk : ${WHITE}$TARGET_DISK${NC}"
 echo -e " EFI Boot    : ${WHITE}$EFI_PART${NC} (Format: $FORMAT_EFI)"
 echo -e " System Root : ${WHITE}$ROOT_PART${NC} (Format: YES)"
+echo -e " Swap Size   : ${WHITE}${SWAP_SIZE}GB${NC}"
 echo -e "${GREEN}=============================${NC}"
 
 ask_input "CONFIRM" "Type 'yes' to proceed with installation"
@@ -406,27 +408,32 @@ ask_input "CONFIRM" "Type 'yes' to proceed with installation"
 # ==============================================================================
 start_step "5" "CORE INSTALLATION"
 
-# 5.1 Optimization
+# PRO FIX: "Pulse Check" to prevent hanging
+echo -e "${ICON_INF} Verifying connection before download..."
+if ! ping -c 1 google.com &>/dev/null; then
+    echo -e "${ICON_ERR} Connection lost. Cannot proceed with download."
+    exit 1
+fi
+
+DISK_MODIFIED=1
+
 echo -e "${ICON_INF} Optimizing Pacman (Parallel Downloads)..."
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 
-# 5.2 Formatting
 echo -e "${ICON_INF} Formatting Filesystems..."
-mkfs.ext4 -F $ROOT_PART &>/dev/null
+# [CRITICAL] Added error checking
+mkfs.ext4 -F "$ROOT_PART" &>/dev/null || { echo -e "${ICON_ERR} Failed to format Root"; exit 1; }
+
 if [[ "$FORMAT_EFI" == "yes" ]]; then
-    echo -e "${ICON_INF} Formatting EFI Partition..."
-    mkfs.vfat -F32 $EFI_PART &>/dev/null
-else
-    echo -e "${ICON_INF} Preserving existing EFI Data..."
+    mkfs.vfat -F32 "$EFI_PART" &>/dev/null || { echo -e "${ICON_ERR} Failed to format EFI"; exit 1; }
 fi
 
-# 5.3 Mounting
 echo -e "${ICON_INF} Mounting Partitions..."
-mount $ROOT_PART /mnt
+# [CRITICAL] Added error checking.
+mount "$ROOT_PART" /mnt || { echo -e "${ICON_ERR} Failed to mount Root"; exit 1; }
 mkdir -p /mnt/boot
-mount $EFI_PART /mnt/boot
+mount "$EFI_PART" /mnt/boot || { echo -e "${ICON_ERR} Failed to mount EFI"; exit 1; }
 
-# 5.4 CPU Detection
 echo -e "${ICON_INF} Detecting CPU..."
 if grep -q "AuthenticAMD" /proc/cpuinfo; then
     UCODE="amd-ucode"
@@ -436,28 +443,27 @@ else
     echo -e "${ICON_OK} Intel CPU Detected."
 fi
 
-# 5.5 Base Install (BACKGROUNDED + PROGRESS BAR)
-echo -e "${ICON_INF} Installing Base System..."
+echo -e "${ICON_INF} Installing Base System (Zen)..."
 echo -e "${DIM} (Logs available at /tmp/arch-install.log)${NC}"
 
-# Run installation in background, log output to file
+# REVERTED TO v1.0.3 LOGIC: 
+# 1. Removed 'reflector' (caused pacstrap failure).
+# 2. Restored 'linux-zen' (matches your working version).
 pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
-    $UCODE mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
+    "$UCODE" mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
     networkmanager bluez bluez-utils power-profiles-daemon \
     git nano ntfs-3g dosfstools mtools &> /tmp/arch-install.log &
 
-# Capture PID of pacstrap
 INSTALL_PID=$!
-
-# Show the Progress Animation while PID runs
 show_progress_bar $INSTALL_PID
 
-# Check if it succeeded
 wait $INSTALL_PID
 if [ $? -eq 0 ]; then
     echo -e "${ICON_OK} Core packages installed."
 else
-    echo -e "\n${ICON_ERR} Installation Failed. Check /tmp/arch-install.log"
+    # FORCE SHOW ERROR if pacstrap fails
+    echo -e "\n${ICON_ERR} Installation Failed. Viewing Log:"
+    tail -n 10 /tmp/arch-install.log
     exit 1
 fi
 
@@ -469,7 +475,15 @@ genfstab -U /mnt >> /mnt/etc/fstab
 # ==============================================================================
 start_step "6" "USER & SYSTEM CONFIGURATION"
 
-ask_input "MY_USER" "Enter Desired Username"
+while true; do
+    ask_input "MY_USER" "Enter Desired Username"
+    if [[ "$MY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+        break
+    else
+        echo -e "${ICON_ERR} Invalid format. Use lowercase letters, numbers, _ or - only."
+    fi
+done
+
 while true; do
     echo -ne "${YELLOW}${BOLD} ➜ ${NC}${WHITE}Password${NC}: "
     read -s P1; echo
@@ -480,15 +494,15 @@ while true; do
 done
 echo ""
 
-export TIMEZONE LOCALE KEYMAP MY_HOSTNAME MY_USER MY_PASS
+export SWAP_SIZE TIMEZONE LOCALE KEYMAP MY_HOSTNAME MY_USER MY_PASS
 
 echo -e "${ICON_INF} Configuring System Internals..."
 
-# SILENCED CHROOT COMMANDS for cleaner UI
-# Using &> /dev/null on commands that emit status text
+# [CRITICAL] Ensuring bootloader setup matches v1.0.3 logic
 arch-chroot /mnt /bin/bash <<EOF
-ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
+ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
 hwclock --systohc &>/dev/null
+
 echo "$LOCALE UTF-8" > /etc/locale.gen
 locale-gen &>/dev/null
 echo "LANG=$LOCALE" > /etc/locale.conf
@@ -496,13 +510,21 @@ echo "KEYMAP=$KEYMAP" > /etc/vconsole.conf
 echo "$MY_HOSTNAME" > /etc/hostname
 
 echo "root:$MY_PASS" | chpasswd
-useradd -m -G wheel,storage,power,video -s /bin/bash $MY_USER
+useradd -m -G wheel,storage,power,video -s /bin/bash "$MY_USER"
 echo "$MY_USER:$MY_PASS" | chpasswd
-echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
+
+echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/00_arch_installer
+chmod 440 /etc/sudoers.d/00_arch_installer
 
 pacman -S --noconfirm grub efibootmgr os-prober &>/dev/null
 echo "GRUB_DISABLE_OS_PROBER=false" >> /etc/default/grub
+
+# Explicit check for GRUB install failure
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=Arch &>/dev/null
+if [ \$? -ne 0 ]; then
+    echo "GRUB_FAIL" > /boot/grub_fail_flag
+fi
+
 grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
 
 systemctl enable NetworkManager &>/dev/null
@@ -512,16 +534,29 @@ systemctl enable fstrim.timer &>/dev/null
 
 sed -i "s/#MAKEFLAGS=\"-j2\"/MAKEFLAGS=\"-j\$(nproc)\"/" /etc/makepkg.conf
 
-dd if=/dev/zero of=/swapfile bs=1G count=4 status=none
+dd if=/dev/zero of=/swapfile bs=1G count=$SWAP_SIZE status=none
 chmod 600 /swapfile
 mkswap /swapfile &>/dev/null
 swapon /swapfile &>/dev/null
 echo "/swapfile none swap defaults 0 0" >> /etc/fstab
 
-echo "set tabsize 4" > /home/$MY_USER/.nanorc
-echo "set tabstospaces" >> /home/$MY_USER/.nanorc
-chown $MY_USER:$MY_USER /home/$MY_USER/.nanorc
+echo "set tabsize 4" > "/home/$MY_USER/.nanorc"
+echo "set tabstospaces" >> "/home/$MY_USER/.nanorc"
+chown "$MY_USER:$MY_USER" "/home/$MY_USER/.nanorc"
 EOF
+
+if [ -f /mnt/boot/grub_fail_flag ]; then
+    echo -e "${ICON_ERR} Bootloader installation failed."
+    echo -e "${DIM} Check if your EFI partition is full or corrupted.${NC}"
+    exit 1
+fi
+
+unset MY_PASS P1 P2
+DISK_MODIFIED=0
+
+# [CRITICAL FIX] Unmount everything to ensure data is written to disk
+echo -e "${ICON_INF} Finalizing and Unmounting..."
+umount -R /mnt &>/dev/null
 
 # ==============================================================================
 # FINALIZATION
@@ -529,7 +564,7 @@ EOF
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${WHITE}${BOLD}   INSTALLATION SUCCESSFUL v1.0.3 ${NC}"
+echo -e "${CYAN}${BOLD}    INSTALLATION SUCCESSFUL v2.5.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

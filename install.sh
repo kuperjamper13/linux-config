@@ -1,26 +1,21 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v1.3.0
-#  Enterprise Grade | Dual-Boot Safe | Neon Aesthetic
+#  ARCH LINUX UNIVERSAL INSTALLER v1.4.0
+#  Final Polish | Hard Reset UI | Robust Partitioning
 # ==============================================================================
 
 # --- [1] VISUAL LIBRARY -------------------------------------------------------
-# Reset
 NC='\033[0m'
-
-# Flashy Neon Palette (Bright/Bold)
 BOLD='\033[1m'
 MAGENTA='\033[1;35m'
 CYAN='\033[1;36m'
-BLUE='\033[1;34m'
 GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
 RED='\033[1;31m'
 WHITE='\033[1;37m'
 DIM='\033[2m'
 
-# Status Indicators
 ICON_OK="[${GREEN}  OK  ${NC}]"
 ICON_ERR="[${RED} FAIL ${NC}]"
 ICON_WRN="[${YELLOW} WARN ${NC}]"
@@ -28,21 +23,25 @@ ICON_ASK="[${MAGENTA}  ??  ${NC}]"
 ICON_INF="[${CYAN} INFO ${NC}]"
 
 # --- [2] UI UTILITIES ---------------------------------------------------------
+function hard_clear {
+    # Forces a terminal reset to prevent "ghost text" from previous steps
+    printf "\033c"
+}
+
 function print_banner {
     echo -e "${MAGENTA}"
-    echo " ▄▄▄      ██████╗  ████████╗ ██╗  ██╗"
-    echo " ████╗    ██╔══██╗ ██╔═════╝ ██║  ██║"
-    echo " ██╔██╗   ██████╔╝ ██║       ███████║"
-    echo " ██║╚██╗  ██╔══██╗ ██║       ██╔══██║"
-    echo " ██║ ╚██╗ ██║  ██║ ████████╗ ██║  ██║"
-    echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.3.0"
+    echo " ▄▄▄      ██████╗  ███████╗ ██╗  ██╗"
+    echo " ████╗    ██╔══██╗ ██╔════╝ ██║  ██║"
+    echo " ██╔██╗   ██████╔╝ ██║      ███████║"
+    echo " ██║╚██╗  ██╔══██╗ ██║      ██╔══██║"
+    echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
+    echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.0.0"
     echo -e "${NC}"
 }
 
 function start_step {
-    # Clears screen and re-draws banner for a clean look per step
-    clear
+    hard_clear
     print_banner
     echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
     echo -e "${BOLD} STEP $1 :: $2 ${NC}"
@@ -50,7 +49,6 @@ function start_step {
 }
 
 function ask_input {
-    # High visibility input prompt
     local var_name=$1
     local prompt_text=$2
     local default_val=$3
@@ -70,7 +68,6 @@ function ask_input {
 }
 
 function print_menu_grid {
-    # Prints options in a 2-column grid for better readability
     local -n arr=$1
     local len=${#arr[@]}
     local half=$(( (len + 1) / 2 ))
@@ -80,14 +77,14 @@ function print_menu_grid {
         val1="${arr[$i]}"
         val2="${arr[$i+half]}"
         
-        # Column 1
         idx1=$((i+1))
-        printf "  ${CYAN}%2d)${NC} %-20s" "$idx1" "$val1"
+        # Column 1 (Widened to 25 chars)
+        printf "  ${CYAN}%2d)${NC} %-25s" "$idx1" "$val1"
         
-        # Column 2 (if exists)
+        # Column 2
         if [[ -n "$val2" ]]; then
             idx2=$((i+half+1))
-            printf "  ${CYAN}%2d)${NC} %-20s" "$idx2" "$val2"
+            printf "  ${CYAN}%2d)${NC} %-25s" "$idx2" "$val2"
         fi
         echo ""
     done
@@ -102,6 +99,7 @@ start_step "1" "SYSTEM IDENTITY CONFIGURATION"
 echo -e "${ICON_INF} Configure the network identity for this machine."
 ask_input "MY_HOSTNAME" "Enter Hostname" "arch-linux"
 echo -e "${ICON_OK} Hostname set to: ${BOLD}$MY_HOSTNAME${NC}"
+sleep 1
 
 # ==============================================================================
 # SECTION 2: INPUT & REGION
@@ -120,7 +118,7 @@ while true; do
         echo -e "${ICON_OK} Selected: ${BOLD}$KEYMAP${NC}"
         break
     else
-        echo -e "${ICON_ERR} Invalid option. Try again."
+        echo -e "${ICON_ERR} Invalid option."
     fi
 done
 
@@ -142,7 +140,6 @@ done
 
 # 2.3 Timezone
 echo -e "\n${ICON_INF} Select Timezone Region"
-# Get clean list of regions
 mapfile -t regions < <(find /usr/share/zoneinfo -maxdepth 1 -type d | cut -d/ -f5 | grep -vE "posix|right|Etc|SystemV|iso3166|Arctic|Antarctica")
 print_menu_grid regions
 
@@ -158,8 +155,7 @@ done
 
 echo -e "\n${ICON_INF} Select City in $REGION"
 mapfile -t cities < <(ls /usr/share/zoneinfo/$REGION)
-# Only show first 20 cities to avoid flooding screen, allow typing
-echo -e "${DIM} (Listing first 20 cities - Type name manually if not listed)${NC}"
+# Show top 20 to prevent scrolling mess
 short_cities=("${cities[@]:0:20}")
 print_menu_grid short_cities
 
@@ -257,37 +253,41 @@ fi
 
 # 4.3 Strategy Selection
 echo -e "\n${ICON_INF} Select Partitioning Strategy"
-echo -e " ${BOLD}[1] Use Free Space${NC}  :: (Dual-Boot Safe) Auto-fills empty space."
-echo -e " ${BOLD}[2] Wipe Entire Disk${NC}:: (Clean Install)  Destroys ALL data."
-echo -e " ${BOLD}[3] Manual Mode${NC}     :: (Advanced User)  Launch partition editor."
+strategies=("Use Free Space (Dual Boot Safe)" "Wipe Entire Disk (Clean Install)" "Manual Mode (Advanced)")
+print_menu_grid strategies
 
-echo ""
-ask_input "STRATEGY" "Select Option [1-3]"
+ask_input "STRATEGY_OPT" "Select Strategy Number"
 
-# 4.4 Execution Logic
-case $STRATEGY in
+case $STRATEGY_OPT in
     1)
         # --- USE FREE SPACE ---
         echo -e "${ICON_INF} Scanning for unallocated space..."
         sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Root" $TARGET_DISK
-        partprobe $TARGET_DISK && sync && sleep 2
+        echo -e "${ICON_INF} Syncing Disk Map (Waiting 3s)..."
+        partprobe $TARGET_DISK && sync && sleep 3
         
+        # Auto-Detect: Use PATH column to avoid spaces issue in names
         ROOT_PART=$(lsblk -n -o PATH,PARTLABEL $TARGET_DISK | grep "Arch Root" | tail -n1 | awk '{print $1}')
         
+        # Robust Fallback if Partprobe was too slow
         if [[ -z "$ROOT_PART" ]]; then
-             echo -e "${ICON_WRN} Auto-detect failed. Manual input required:"
+             echo -e "${ICON_WRN} Auto-detect needs confirmation."
+             echo -e "${ICON_INF} Current Partitions:"
              lsblk $TARGET_DISK -o NAME,SIZE,TYPE,LABEL
-             ask_input "ROOT_INPUT" "Enter Root Partition Name (e.g. nvme0n1p3)"
+             ask_input "ROOT_INPUT" "Identify the new Partition (e.g. nvme0n1p3)"
              ROOT_PART="/dev/${ROOT_INPUT#/dev/}"
+        else
+             echo -e "${ICON_OK} Auto-Detected New Partition: ${BOLD}$ROOT_PART${NC}"
         fi
         
+        # EFI Detection
         AUTO_EFI=$(fdisk -l $TARGET_DISK | grep 'EFI System' | awk '{print $1}' | head -n 1)
         if [[ -n "$AUTO_EFI" ]]; then
             EFI_PART=$AUTO_EFI
             FORMAT_EFI="no"
-            echo -e "${ICON_OK} Found Windows Boot Manager at ${BOLD}$EFI_PART${NC}"
+            echo -e "${ICON_OK} Detected Windows Boot Manager at ${BOLD}$EFI_PART${NC}"
         else
-            echo -e "${ICON_ERR} No EFI Partition found."
+            echo -e "${ICON_ERR} No EFI Partition found. System requires EFI."
             exit 1
         fi
         ;;
@@ -302,7 +302,7 @@ case $STRATEGY in
         sgdisk -Z $TARGET_DISK &>/dev/null
         sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI System" $TARGET_DISK &>/dev/null
         sgdisk -n 2:0:0     -t 2:8304 -c 2:"Arch Root"  $TARGET_DISK &>/dev/null
-        partprobe $TARGET_DISK && sync && sleep 2
+        partprobe $TARGET_DISK && sync && sleep 3
         
         if [[ "$TARGET_DISK" == *"nvme"* ]]; then
             EFI_PART="${TARGET_DISK}p1"; ROOT_PART="${TARGET_DISK}p2"
@@ -317,7 +317,7 @@ case $STRATEGY in
         echo -e "${ICON_INF} Launching cfdisk..."
         read -p "Press Enter to continue..."
         cfdisk $TARGET_DISK
-        partprobe $TARGET_DISK && sync && sleep 2
+        partprobe $TARGET_DISK && sync && sleep 3
         
         echo -e "\n${CYAN}:: Partition Map ::${NC}"
         lsblk $TARGET_DISK -o NAME,SIZE,TYPE,FSTYPE,LABEL
@@ -335,7 +335,7 @@ esac
 
 # 4.5 Safety Verification
 if [ ! -b "$ROOT_PART" ] || [ ! -b "$EFI_PART" ]; then
-    echo -e "${ICON_ERR} Partition check failed. Partitions do not exist."
+    echo -e "${ICON_ERR} Partition check failed. Defined partitions do not exist."
     exit 1
 fi
 
@@ -368,13 +368,13 @@ else
 fi
 
 # 5.3 Mounting
-echo -e "${ICON_INF} Mounting Partitions..."
+echo -e "${ICON_INF} Mounting Partitions to /mnt..."
 mount $ROOT_PART /mnt
 mkdir -p /mnt/boot
 mount $EFI_PART /mnt/boot
 
 # 5.4 CPU Detection
-echo -e "${ICON_INF} Detecting CPU..."
+echo -e "${ICON_INF} Detecting Processor Architecture..."
 if grep -q "AuthenticAMD" /proc/cpuinfo; then
     UCODE="amd-ucode"
     echo -e "${ICON_OK} AMD CPU Detected."
@@ -384,7 +384,7 @@ else
 fi
 
 # 5.5 Base Install
-echo -e "${ICON_INF} Installing Base System (This may take time)..."
+echo -e "${ICON_INF} Downloading and Installing Base System (This may take time)..."
 pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
     $UCODE mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
     networkmanager bluez bluez-utils power-profiles-daemon \
@@ -411,7 +411,7 @@ done
 
 export TIMEZONE LOCALE KEYMAP MY_HOSTNAME MY_USER MY_PASS
 
-echo -e "${ICON_INF} Configuring System Internals..."
+echo -e "${ICON_INF} Configuring System Internals (Chroot)..."
 arch-chroot /mnt /bin/bash <<EOF
 ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
 hwclock --systohc
@@ -452,10 +452,10 @@ EOF
 # ==============================================================================
 # FINALIZATION
 # ==============================================================================
-clear
+hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.3.0 ${NC}"
+echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.4.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

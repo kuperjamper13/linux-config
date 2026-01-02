@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v1.7.0
-#  Final Stable | Keyring Fix | Corrected ASCII
+#  ARCH LINUX UNIVERSAL INSTALLER v1.9.0
+#  Performance Edition | Visual Progress | Auto-Mirrors
 # ==============================================================================
 
 # --- [1] VISUAL LIBRARY -------------------------------------------------------
@@ -35,7 +35,7 @@ function print_banner {
     echo " ██║╚██╗  ██╔══██╗ ██║      ██╔══██║"
     echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.7.0"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.9.0"
     echo -e "${NC}"
 }
 
@@ -247,7 +247,7 @@ else
     echo -e "          -> Strategy: ${YELLOW}Low Memory.${NC} Swapfile is critical."
 fi
 
-# 4.3 Strategy Selection - LOOP for Error Handling
+# 4.3 Strategy Selection
 while true; do
     echo -e "\n${ICON_INF} Select Partitioning Strategy"
     echo -e "  ${CYAN} 1)${NC} Use Free Space (Dual Boot Safe)"
@@ -266,8 +266,6 @@ while true; do
         1)
             # --- USE FREE SPACE ---
             echo -e "${ICON_INF} Scanning for unallocated space..."
-            
-            # Execute without trapping errors strictlly
             sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Root" $TARGET_DISK &>/dev/null
 
             echo -e "${ICON_OK} Syncing Disk Map..."
@@ -361,13 +359,15 @@ ask_input "CONFIRM" "Type 'yes' to proceed with installation"
 # ==============================================================================
 start_step "5" "CORE INSTALLATION"
 
-# 5.1 Optimization
-echo -e "${ICON_INF} Optimizing Pacman (Parallel Downloads)..."
+# 5.1 Optimization & Mirror Ranking
+echo -e "${ICON_INF} Optimizing Mirrors (Finding fastest servers)..."
+# This prevents the "slow download" issue by finding the top 5 fastest mirrors
+reflector --verbose --latest 5 --sort rate --save /etc/pacman.d/mirrorlist &>/dev/null
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 
-# 5.2 Keyring Fix (PREVENTS HANGS)
-echo -e "${ICON_INF} Refreshing Arch Keyring (Prevents Installation Hangs)..."
-pacman -Sy --noconfirm archlinux-keyring
+# 5.2 Keyring Fix (SILENT)
+echo -e "${ICON_INF} Refreshing Verification Keys (Silent)..."
+pacman -Sy --noconfirm archlinux-keyring &>/dev/null
 
 # 5.3 Formatting
 echo -e "${ICON_INF} Formatting Filesystems..."
@@ -396,13 +396,16 @@ else
 fi
 
 # 5.6 Base Install
-echo -e "${ICON_INF} Downloading and Installing Base System (This may take time)..."
-pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
+echo -e "${ICON_INF} Downloading Base System..."
+echo -e "${DIM} (Output visible to track progress)${NC}"
+
+# REMOVED '&>/dev/null' so you can see the progress bars!
+pacstrap -K --noconfirm /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
     $UCODE mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
     networkmanager bluez bluez-utils power-profiles-daemon \
-    git nano ntfs-3g dosfstools mtools &>/dev/null
+    git nano ntfs-3g dosfstools mtools || { echo -e "\n${ICON_ERR} Installation Failed."; exit 1; }
 
-echo -e "${ICON_OK} Core packages installed."
+echo -e "\n${ICON_OK} Core packages installed."
 echo -e "${ICON_INF} Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
 
@@ -467,7 +470,7 @@ EOF
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.7.0 ${NC}"
+echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.9.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

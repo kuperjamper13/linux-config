@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v1.0.1
-#  Final Release | Clean UI | Visual Progress Bar
+#  ARCH LINUX UNIVERSAL INSTALLER v1.0.0
+#  First Release | Clean UI | Perfected Animations | High Performance
 # ==============================================================================
 
 # --- [1] VISUAL LIBRARY -------------------------------------------------------
@@ -29,13 +29,13 @@ function hard_clear {
 
 function print_banner {
     echo -e "${MAGENTA}"
-    echo " ▄▄▄        ██████╗  ████████╗ ██╗  ██╗"
-    echo " ████╗      ██╔══██╗ ██╔═════╝ ██║  ██║"
-    echo " ██╔██╗     ██████╔╝ ██║       ███████║"
-    echo " ██║╚██╗    ██╔══██╗ ██║       ██╔══██║"
-    echo " ██║ ╚██╗   ██║  ██║ ████████╗ ██║  ██║"
-    echo " ╚═╝  ╚═╝   ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.0.1"
+    echo " ▄▄▄      ██████╗  ███████╗ ██╗  ██╗"
+    echo " ████╗    ██╔══██╗ ██╔════╝ ██║  ██║"
+    echo " ██╔██╗   ██████╔╝ ██║      ███████║"
+    echo " ██║╚██╗  ██╔══██╗ ██║      ██╔══██║"
+    echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
+    echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.0.3"
     echo -e "${NC}"
 }
 
@@ -103,7 +103,7 @@ function show_progress_bar {
     echo -ne "\n  ${BOLD}Installing:${NC} ["
     
     while ps -p $pid > /dev/null; do
-        # Build the bar string
+        # Build the bouncing arrow
         local bar=""
         for ((j=0; j<width; j++)); do
             if [ $j -eq $i ]; then
@@ -114,7 +114,7 @@ function show_progress_bar {
         done
         
         # Print the bar (using \r to overwrite line)
-        # Using substring to keep bar length fixed in case of overflow logic
+        # Using substring to keep bar length fixed
         printf "\r  ${BOLD}Installing:${NC} [${CYAN}%-${width}s${NC}]" "${bar:0:$width}"
         
         # Move the bouncer
@@ -126,8 +126,10 @@ function show_progress_bar {
         sleep $delay
     done
     
-    # Finalize bar
-    printf "\r  ${BOLD}Installing:${NC} [${GREEN}%-${width}s${NC}]\n" "$(printf '=%0.s' {1..30})"
+    # FINISHED STATE: Fill with Cyan and add "Done"
+    # Generates a string of '=' characters exactly 'width' long
+    local full_bar=$(printf '=%0.s' $(seq 1 $width))
+    printf "\r  ${BOLD}Installing:${NC} [${CYAN}$full_bar${NC}] Done\n"
     
     # Restore cursor
     tput cnorm
@@ -438,7 +440,7 @@ fi
 echo -e "${ICON_INF} Installing Base System..."
 echo -e "${DIM} (Logs available at /tmp/arch-install.log)${NC}"
 
-# Run installation in background, log output to file for debugging if needed
+# Run installation in background, log output to file
 pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
     $UCODE mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
     networkmanager bluez bluez-utils power-profiles-daemon \
@@ -476,6 +478,7 @@ while true; do
     [[ "$P1" == "$P2" && -n "$P1" ]] && MY_PASS="$P1" && break
     echo -e "${ICON_ERR} Passwords do not match."
 done
+echo ""
 
 export TIMEZONE LOCALE KEYMAP MY_HOSTNAME MY_USER MY_PASS
 
@@ -526,7 +529,7 @@ EOF
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${WHITE}${BOLD}   INSTALLATION SUCCESSFUL v1.0.1 ${NC}"
+echo -e "${WHITE}${BOLD}   INSTALLATION SUCCESSFUL v1.0.3 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

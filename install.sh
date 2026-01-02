@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v2.9.0
-#  Zen Kernel | Strict Mode | Dry-Run Capable | Reflector Safe
+#  ARCH LINUX UNIVERSAL INSTALLER v3.0.0
+#  Zen Kernel | Strict Mode | GUID-Aware | Robust Network
 # ==============================================================================
 
 # --- [0] PRE-FLIGHT ARGUMENTS & CONFIG ----------------------------------------
-# 1. Safety Fix: Restore 'set -e' for strict error handling
+# 1. Safety: Strict error handling
 set -euo pipefail
 
 # 1.1 Polish: Dry-run / simulation mode
@@ -49,7 +49,7 @@ fatal() {
     exit 1
 }
 
-# 2. Safety Fix: Removed 'eval' to prevent injection risks
+# 2. Safety: No eval
 run_safe() {
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo -e "${ICON_DRY} Would run: $*"
@@ -80,7 +80,6 @@ fi
 DISK_MODIFIED=0
 
 cleanup() {
-    # 'set -e' makes this run on any error, so we check DISK_MODIFIED
     tput cnorm 2>/dev/null || true
     if [[ "$DISK_MODIFIED" -eq 1 ]]; then
         echo -e "\n${ICON_WRN} Script stopped after disk modification."
@@ -104,7 +103,7 @@ function print_banner {
     echo " ██║╚██╗    ██╔══██╗ ██║        ██╔══██║"
     echo " ██║ ╚██╗   ██║  ██║ ████████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝   ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.9.0"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v3.0.0"
     echo "  >> ZEN KERNEL + ARCH STANDARDS"
     echo -e "${NC}"
     
@@ -279,13 +278,13 @@ sleep 1
 # ==============================================================================
 start_step "3" "NETWORK CONNECTIVITY CHECK"
 
-# 2.2 Edge-Case: IPv6 Fallback
+# 3. Polish: Neutral ping dependency (removes google.com hard requirement)
 check_internet() {
-    ping -c 1 google.com &>/dev/null || ping -6 -c 1 google.com &>/dev/null
+    ping -c 1 archlinux.org &>/dev/null || \
+    ping -c 1 1.1.1.1 &>/dev/null || \
+    ping -6 -c 1 archlinux.org &>/dev/null
 }
 
-# The '|| true' is CRITICAL because of 'set -e'. If the first ping check fails,
-# the script would exit without the '|| true', preventing us from entering the recovery block.
 if check_internet || true; then
     if check_internet; then
         echo -e "${ICON_OK} Internet Connection: ${GREEN}Active${NC}"
@@ -297,7 +296,9 @@ if check_internet || true; then
             fatal "iwctl not found. Cannot configure WiFi."
         fi
 
-        WIFI_INTERFACE=$(ip link | awk -F: '$0 !~ "lo|vir|eth" {print $2;getline}' | head -n 1 | tr -d ' ')
+        # 2. Polish: More robust WiFi interface detection using 'iw dev'
+        # This prevents picking up docker0 or virtual bridges by mistake.
+        WIFI_INTERFACE=$(iw dev | awk '$1=="Interface"{print $2; exit}')
         
         if [[ -z "$WIFI_INTERFACE" ]]; then
             echo -e "${ICON_ERR} No Wireless Interface found."
@@ -344,7 +345,6 @@ fi
 # 2.7 Edge-Case: Update Keyring
 echo -e "${ICON_INF} Updating Arch Keyring..."
 if [[ "$DRY_RUN" -eq 0 ]]; then
-    # We use '|| true' to prevent 'set -e' from killing script on keyring failure (non-fatal)
     pacman -Sy --noconfirm archlinux-keyring &>/dev/null || echo -e "${ICON_WRN} Keyring update failed."
 fi
 
@@ -365,8 +365,10 @@ sleep 1
 start_step "4" "STORAGE ARCHITECTURE"
 
 echo -e "${ICON_INF} Detected Storage Devices:"
-# Added '|| true' because grep returning empty is exit code 1
-lsblk -d -n -o NAME,SIZE,MODEL,TYPE | grep 'disk' || true | awk '{print "    • /dev/" $1 " [" $2 "] " $3}'
+# 1. Polish: Fix grep|awk pipeline precedence. 
+# Using "grep ... | awk ... || true" ensures we don't crash if no disks found, 
+# while still filtering correctly before awk sees it.
+lsblk -d -n -o NAME,SIZE,MODEL,TYPE | grep 'disk' | awk '{print "    • /dev/" $1 " [" $2 "] " $3}' || echo "    • No disks detected."
 echo ""
 
 while true; do
@@ -454,8 +456,9 @@ while true; do
                  ROOT_PART="${TARGET_DISK}pX"
             fi
             
-            # 10. Edge-Case: Multiple EFI detection
-            mapfile -t EFI_LIST < <(fdisk -l | grep 'EFI System' | awk '{print $1}')
+            # 4. Polish: Locale-independent EFI detection using Type GUID
+            # c12a7328-f81f-11d2-ba4b-00a0c93ec93b is the GPT GUID for EFI System Partition
+            mapfile -t EFI_LIST < <(lsblk -n -o PATH,PARTTYPE "$TARGET_DISK" | grep -i 'c12a7328-f81f-11d2-ba4b-00a0c93ec93b' | awk '{print $1}')
             
             if [ ${#EFI_LIST[@]} -eq 0 ]; then
                 fatal "No EFI Partition found."
@@ -647,13 +650,15 @@ else
 fi
 EOF
 
+# 5. Polish: Extreme Paranoia (Clear passwords and history)
 unset MY_PASS P1 P2
+history -c
 DISK_MODIFIED=0
 
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${CYAN}${BOLD}    INSTALLATION SUCCESSFUL v2.9.0 ${NC}"
+echo -e "${CYAN}${BOLD}    INSTALLATION SUCCESSFUL v3.0.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e "\n 1. Type ${BOLD}reboot${NC} to start your new system."
 echo -e " 2. Login as: ${BOLD}$MY_USER${NC}\n"

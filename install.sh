@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v2.5.0 (Hybrid Fix)
-#  v1.0.3 Logic (Stable) + v2.4 UI + Safety Checks
+#  ARCH LINUX UNIVERSAL INSTALLER v1.1.0
+#  Installing arch the easy way.
 # ==============================================================================
 
 # --- [0] SAFETY PRE-FLIGHT ----------------------------------------------------

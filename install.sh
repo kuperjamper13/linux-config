@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v3.0.0
-#  Zen Kernel | Strict Mode | GUID-Aware | Robust Network
+#  ARCH LINUX UNIVERSAL INSTALLER v1.2.0
+#  Instaling arch made easy.
 # ==============================================================================
 
 # --- [0] PRE-FLIGHT ARGUMENTS & CONFIG ----------------------------------------
@@ -97,14 +97,13 @@ function hard_clear {
 
 function print_banner {
     echo -e "${MAGENTA}"
-    echo " ▄▄▄        ██████╗  ████████╗ ██╗  ██╗"
-    echo " ████╗      ██╔══██╗ ██╔═════╝ ██║  ██║"
-    echo " ██╔██╗     ██████╔╝ ██║        ███████║"
-    echo " ██║╚██╗    ██╔══██╗ ██║        ██╔══██║"
-    echo " ██║ ╚██╗   ██║  ██║ ████████╗ ██║  ██║"
-    echo " ╚═╝  ╚═╝   ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v3.0.0"
-    echo "  >> ZEN KERNEL + ARCH STANDARDS"
+    echo " ▄▄▄      ██████╗  ████████╗ ██╗  ██╗"
+    echo " ████╗    ██╔══██╗ ██╔═════╝ ██║  ██║"
+    echo " ██╔██╗   ██████╔╝ ██║       ███████║"
+    echo " ██║╚██╗  ██╔══██╗ ██║       ██╔══██║"
+    echo " ██║ ╚██╗ ██║  ██║ ████████╗ ██║  ██║"
+    echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.2.0"
     echo -e "${NC}"
     
     if [[ "$DRY_RUN" -eq 1 ]]; then

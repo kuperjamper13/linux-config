@@ -53,7 +53,6 @@ function print_banner {
     echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
     echo "  >> UNIVERSAL INSTALLER SYSTEM v2.4.0"
-    echo "  >> PLATINUM EDITION"
     echo -e "${NC}"
 }
 

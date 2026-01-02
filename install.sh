@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v2.1.0
-#  Diamond Hardened | Secure | Production Grade
+#  ARCH LINUX UNIVERSAL INSTALLER v2.2.0
+#  Performance Edition | Dynamic Swap | Mirror Reflector
 # ==============================================================================
 
 # --- [0] SAFETY PRE-FLIGHT ----------------------------------------------------
@@ -42,8 +42,8 @@ function print_banner {
     echo " ██║╚██╗    ██╔══██╗ ██║       ██╔══██║"
     echo " ██║ ╚██╗   ██║  ██║ ████████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝   ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.1.0"
-    echo "  >> SECURITY HARDENED EDITION"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.2.0"
+    echo "  >> PERFORMANCE EDITION"
     echo -e "${NC}"
 }
 
@@ -56,7 +56,6 @@ function start_step {
 }
 
 function ask_input {
-    # SECURE INPUT: Replaced 'eval' with 'printf -v' to prevent code injection
     local var_name="$1"
     local prompt_text="$2"
     local default_val="${3:-}"
@@ -201,7 +200,6 @@ while true; do
         CITY="$CITY_INPUT"
     fi
     
-    # HARDENED FIX: Validate Timezone Exists to prevent bad symlink
     if [ -f "/usr/share/zoneinfo/$REGION/$CITY" ]; then
         TIMEZONE="$REGION/$CITY"
         echo -e "${ICON_OK} Timezone set to: ${BOLD}$TIMEZONE${NC}"
@@ -217,16 +215,13 @@ sleep 1
 # ==============================================================================
 start_step "3" "NETWORK CONNECTIVITY CHECK"
 
-# '|| true' allows script to continue if ping fails (Strict Mode safety)
 if ping -c 1 google.com &> /dev/null || true; then
-    # Double check return code
     if ping -c 1 google.com &> /dev/null; then
         echo -e "${ICON_OK} Internet Connection: ${GREEN}Active${NC}"
     else
         echo -e "${ICON_ERR} Internet Connection: ${RED}Offline${NC}"
         echo -e "${DIM}Initializing Wireless Interface...${NC}"
         
-        # HARDENED FIX: Use 'iw dev' to ignore docker/veth interfaces
         WIFI_INTERFACE=$(iw dev | awk '$1=="Interface"{print $2; exit}')
         
         if [[ -z "$WIFI_INTERFACE" ]]; then
@@ -293,10 +288,14 @@ TOTAL_RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
 TOTAL_RAM_GB=$(($TOTAL_RAM_KB / 1024 / 1024))
 
 echo -e "   [RAM]  Detected ${BOLD}${TOTAL_RAM_GB}GB${NC} System Memory."
+
+# LOGIC FIX: Variable SWAP_SIZE setting
 if [ $TOTAL_RAM_GB -ge 8 ]; then
     echo -e "          -> Strategy: Standard Swapfile (4GB)."
+    SWAP_SIZE=4
 else
-    echo -e "          -> Strategy: ${YELLOW}Low Memory.${NC} Swapfile is critical."
+    echo -e "          -> Strategy: ${YELLOW}Low Memory.${NC} Swapfile increased to 8GB."
+    SWAP_SIZE=8
 fi
 
 while true; do
@@ -388,6 +387,7 @@ echo -e "\n${GREEN}=== CONFIGURATION SUMMARY ===${NC}"
 echo -e " Target Disk : ${WHITE}$TARGET_DISK${NC}"
 echo -e " EFI Boot    : ${WHITE}$EFI_PART${NC} (Format: $FORMAT_EFI)"
 echo -e " System Root : ${WHITE}$ROOT_PART${NC} (Format: YES)"
+echo -e " Swap Size   : ${WHITE}${SWAP_SIZE}GB${NC}"
 echo -e "${GREEN}=============================${NC}"
 
 ask_input "CONFIRM" "Type 'yes' to proceed with installation"
@@ -397,6 +397,10 @@ ask_input "CONFIRM" "Type 'yes' to proceed with installation"
 # SECTION 5: INSTALLATION PROCESS
 # ==============================================================================
 start_step "5" "CORE INSTALLATION"
+
+# PERF FIX: Add Reflector for mirror optimization (Silent & Safe)
+echo -e "${ICON_INF} Optimizing Mirrors (Reflector)..."
+reflector --latest 20 --protocol https --sort rate --save /etc/pacman.d/mirrorlist &>/dev/null || true
 
 echo -e "${ICON_INF} Optimizing Pacman (Parallel Downloads)..."
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
@@ -424,7 +428,7 @@ fi
 echo -e "${ICON_INF} Installing Base System..."
 echo -e "${DIM} (Logs available at /tmp/arch-install.log)${NC}"
 
-# Switch to standard 'linux' kernel for maximum compatibility/stability
+# Using standard 'linux' kernel for reliability
 pacstrap /mnt base linux linux-headers linux-firmware base-devel \
     "$UCODE" mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
     networkmanager bluez bluez-utils power-profiles-daemon \
@@ -449,7 +453,6 @@ genfstab -U /mnt >> /mnt/etc/fstab
 # ==============================================================================
 start_step "6" "USER & SYSTEM CONFIGURATION"
 
-# HARDENED FIX: Username Validation Loop
 while true; do
     ask_input "MY_USER" "Enter Desired Username"
     if [[ "$MY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
@@ -469,13 +472,15 @@ while true; do
 done
 echo ""
 
+# Export variable specifically for the heredoc logic below
+export SWAP_SIZE
+
 echo -e "${ICON_INF} Configuring System Internals..."
 
 arch-chroot /mnt /bin/bash <<EOF
 ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
 hwclock --systohc &>/dev/null
 
-# SECURITY FIX: Safely uncomment locale instead of overwriting
 sed -i "s/^#$LOCALE/$LOCALE/" /etc/locale.gen
 locale-gen &>/dev/null
 echo "LANG=$LOCALE" > /etc/locale.conf
@@ -486,7 +491,6 @@ echo "root:$MY_PASS" | chpasswd
 useradd -m -G wheel,storage,power,video -s /bin/bash $MY_USER
 echo "$MY_USER:$MY_PASS" | chpasswd
 
-# SECURITY FIX: Use sudoers.d instead of appending to main file
 echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/00_arch_installer
 chmod 440 /etc/sudoers.d/00_arch_installer
 
@@ -502,7 +506,8 @@ systemctl enable fstrim.timer &>/dev/null
 
 sed -i "s/#MAKEFLAGS=\"-j2\"/MAKEFLAGS=\"-j\$(nproc)\"/" /etc/makepkg.conf
 
-dd if=/dev/zero of=/swapfile bs=1G count=4 status=none
+# LOGIC FIX: Use the calculated swap size variable
+dd if=/dev/zero of=/swapfile bs=1G count=$SWAP_SIZE status=none
 chmod 600 /swapfile
 mkswap /swapfile &>/dev/null
 swapon /swapfile &>/dev/null
@@ -514,7 +519,6 @@ echo "set tabstospaces" >> /home/$MY_USER/.nanorc
 chown $MY_USER:$MY_USER /home/$MY_USER/.nanorc
 EOF
 
-# HARDENED FIX: Clear secrets from memory
 unset MY_PASS P1 P2
 
 # ==============================================================================
@@ -523,7 +527,7 @@ unset MY_PASS P1 P2
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${WHITE}${BOLD}   INSTALLATION SUCCESSFUL v2.1.0 ${NC}"
+echo -e "${WHITE}${BOLD}   INSTALLATION SUCCESSFUL v2.2.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

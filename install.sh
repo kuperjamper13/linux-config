@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v2.3.0
-#  Platinum Edition | Edge-Case Hardened | Production Ready
+#  ARCH LINUX UNIVERSAL INSTALLER v2.4.0
+#  Installing arch the easy way.
 # ==============================================================================
 
 # --- [0] SAFETY PRE-FLIGHT ----------------------------------------------------
@@ -52,7 +52,7 @@ function print_banner {
     echo " ██║╚██╗  ██╔══██╗ ██║      ██╔══██║"
     echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.3.0"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.4.0"
     echo "  >> PLATINUM EDITION"
     echo -e "${NC}"
 }
@@ -130,7 +130,7 @@ function show_progress_bar {
     done
     
     local full_bar=$(printf '=%0.s' $(seq 1 $width))
-    printf "\r  ${BOLD}Installing:${NC} [${GREEN}$full_bar${NC}] Done\n"
+    printf "\r  ${BOLD}Installing:${NC} [${CYAN}$full_bar${NC}] Done\n"
     sleep 1
     tput cnorm
 }
@@ -184,7 +184,6 @@ done
 
 # 2.3 Timezone
 echo -e "\n${ICON_INF} Select Timezone Region"
-# PRO FIX: Use directory-agnostic find method
 mapfile -t regions < <(cd /usr/share/zoneinfo && find . -maxdepth 1 -type d ! -name . -printf '%P\n' | sort)
 print_menu_grid regions
 
@@ -380,7 +379,6 @@ while true; do
             EFI_PART="/dev/${E_IN#/dev/}"
             ask_input "FORMAT_EFI" "Format EFI? (yes/no)"
             
-            # PRO FIX: Safety warning for manual EFI format
             if [[ "$FORMAT_EFI" == "yes" ]]; then
                 echo -e "${YELLOW}WARNING: Formatting EFI will delete all other bootloaders (Windows/Fedora)!${NC}"
                 ask_input "EFI_CONFIRM" "Are you sure?"
@@ -416,10 +414,16 @@ ask_input "CONFIRM" "Type 'yes' to proceed with installation"
 # ==============================================================================
 start_step "5" "CORE INSTALLATION"
 
+# PRO FIX: "Pulse Check" to prevent hanging
+echo -e "${ICON_INF} Verifying connection before download..."
+if ! ping -c 1 google.com &>/dev/null; then
+    echo -e "${ICON_ERR} Connection lost. Cannot proceed with download."
+    exit 1
+fi
+
 # PRO FIX: Mark disk as modified for trap handler
 DISK_MODIFIED=1
 
-# PRO FIX: Safe Reflector check
 if command -v reflector &>/dev/null; then
     echo -e "${ICON_INF} Optimizing Mirrors (Reflector)..."
     reflector --latest 20 --protocol https --sort rate --save /etc/pacman.d/mirrorlist &>/dev/null || true
@@ -494,12 +498,10 @@ while true; do
 done
 echo ""
 
-# Export variable specifically for the heredoc logic below
 export SWAP_SIZE
 
 echo -e "${ICON_INF} Configuring System Internals..."
 
-# PRO FIX: Quoted variables inside Heredoc for safety
 arch-chroot /mnt /bin/bash <<EOF
 ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
 hwclock --systohc &>/dev/null
@@ -535,15 +537,12 @@ mkswap /swapfile &>/dev/null
 swapon /swapfile &>/dev/null
 echo "/swapfile none swap defaults 0 0" >> /etc/fstab
 
-# Setup nano for user
 echo "set tabsize 4" > "/home/$MY_USER/.nanorc"
 echo "set tabstospaces" >> "/home/$MY_USER/.nanorc"
 chown "$MY_USER:$MY_USER" "/home/$MY_USER/.nanorc"
 EOF
 
 unset MY_PASS P1 P2
-
-# Flag success so trap doesn't warn
 DISK_MODIFIED=0
 
 # ==============================================================================
@@ -552,7 +551,7 @@ DISK_MODIFIED=0
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${WHITE}${BOLD}   INSTALLATION SUCCESSFUL v2.3.0 ${NC}"
+echo -e "${CYAN}${BOLD}   INSTALLATION SUCCESSFUL v2.4.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

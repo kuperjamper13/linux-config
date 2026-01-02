@@ -6,13 +6,12 @@
 # ==============================================================================
 
 # --- [0] SAFETY PRE-FLIGHT ----------------------------------------------------
-# Strict Mode: Error on unset variables, fail on pipe errors
-set -uo pipefail
+# REMOVED strict mode (set -uo pipefail) as it causes issues with grep/awk pipelines.
+# Added manual error handling instead.
 
 # Global State for Trap
 DISK_MODIFIED=0
 
-# Trap Function: Restores cursor and warns if disk was left dirty
 cleanup() {
     tput cnorm
     if [[ "$DISK_MODIFIED" -eq 1 ]]; then
@@ -52,7 +51,7 @@ function print_banner {
     echo " ██║╚██╗  ██╔══██╗ ██║      ██╔══██║"
     echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.4.0"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.4.1"
     echo -e "${NC}"
 }
 
@@ -183,7 +182,8 @@ done
 
 # 2.3 Timezone
 echo -e "\n${ICON_INF} Select Timezone Region"
-mapfile -t regions < <(cd /usr/share/zoneinfo && find . -maxdepth 1 -type d ! -name . -printf '%P\n' | sort)
+# Fixed find command to be more robust
+mapfile -t regions < <(find /usr/share/zoneinfo -maxdepth 1 -type d | cut -d/ -f5 | grep -vE "posix|right|Etc|SystemV|iso3166|Arctic|Antarctica|^$" | sort)
 print_menu_grid regions
 
 while true; do
@@ -224,48 +224,46 @@ sleep 1
 # ==============================================================================
 start_step "3" "NETWORK CONNECTIVITY CHECK"
 
-if ping -c 1 google.com &> /dev/null || true; then
-    if ping -c 1 google.com &> /dev/null; then
-        echo -e "${ICON_OK} Internet Connection: ${GREEN}Active${NC}"
+if ping -c 1 google.com &> /dev/null; then
+    echo -e "${ICON_OK} Internet Connection: ${GREEN}Active${NC}"
+else
+    echo -e "${ICON_ERR} Internet Connection: ${RED}Offline${NC}"
+    echo -e "${DIM}Initializing Wireless Interface...${NC}"
+    
+    WIFI_INTERFACE=$(iw dev | awk '$1=="Interface"{print $2; exit}')
+    
+    if [[ -z "$WIFI_INTERFACE" ]]; then
+        echo -e "${ICON_ERR} No Wireless Interface found."
     else
-        echo -e "${ICON_ERR} Internet Connection: ${RED}Offline${NC}"
-        echo -e "${DIM}Initializing Wireless Interface...${NC}"
+        echo -e "${ICON_INF} Scanning on Interface: ${BOLD}$WIFI_INTERFACE${NC}"
+        iwctl station "$WIFI_INTERFACE" scan
         
-        WIFI_INTERFACE=$(iw dev | awk '$1=="Interface"{print $2; exit}')
-        
-        if [[ -z "$WIFI_INTERFACE" ]]; then
-            echo -e "${ICON_ERR} No Wireless Interface found."
-        else
-            echo -e "${ICON_INF} Scanning on Interface: ${BOLD}$WIFI_INTERFACE${NC}"
-            iwctl station "$WIFI_INTERFACE" scan
+        echo -e "\n${CYAN}:: Available Networks ::${NC}"
+        iwctl station "$WIFI_INTERFACE" get-networks
+        echo ""
+    
+        while true; do
+            echo -e "${ICON_ASK} WiFi Authentication Required"
+            ask_input "WIFI_SSID" "SSID Name"
             
-            echo -e "\n${CYAN}:: Available Networks ::${NC}"
-            iwctl station "$WIFI_INTERFACE" get-networks
+            echo -ne "${YELLOW}${BOLD} ➜ ${NC}${WHITE}Password${NC}: "
+            read -s WIFI_PASS
             echo ""
-        
-            while true; do
-                echo -e "${ICON_ASK} WiFi Authentication Required"
-                ask_input "WIFI_SSID" "SSID Name"
-                
-                echo -ne "${YELLOW}${BOLD} ➜ ${NC}${WHITE}Password${NC}: "
-                read -s WIFI_PASS
-                echo ""
-                
-                echo -e "${ICON_INF} Authenticating with ${BOLD}$WIFI_SSID${NC}..."
-                iwctl --passphrase "$WIFI_PASS" station "$WIFI_INTERFACE" connect "$WIFI_SSID"
-                
-                echo -e "${ICON_INF} Verifying Handshake (8s timeout)..."
-                sleep 8
-                
-                if ping -c 1 google.com &> /dev/null; then
-                    echo -e "${ICON_OK} ${GREEN}Connection Established Successfully.${NC}"
-                    timedatectl set-ntp true
-                    break
-                else
-                    echo -e "${ICON_ERR} ${RED}Connection Failed.${NC}"
-                fi
-            done
-        fi
+            
+            echo -e "${ICON_INF} Authenticating with ${BOLD}$WIFI_SSID${NC}..."
+            iwctl --passphrase "$WIFI_PASS" station "$WIFI_INTERFACE" connect "$WIFI_SSID"
+            
+            echo -e "${ICON_INF} Verifying Handshake (8s timeout)..."
+            sleep 8
+            
+            if ping -c 1 google.com &> /dev/null; then
+                echo -e "${ICON_OK} ${GREEN}Connection Established Successfully.${NC}"
+                timedatectl set-ntp true
+                break
+            else
+                echo -e "${ICON_ERR} ${RED}Connection Failed.${NC}"
+            fi
+        done
     fi
 fi
 sleep 1
@@ -432,15 +430,18 @@ echo -e "${ICON_INF} Optimizing Pacman (Parallel Downloads)..."
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 
 echo -e "${ICON_INF} Formatting Filesystems..."
-mkfs.ext4 -F "$ROOT_PART" &>/dev/null
+# [CRITICAL FIX] Added error checking (|| exit 1)
+mkfs.ext4 -F "$ROOT_PART" &>/dev/null || { echo -e "${ICON_ERR} Failed to format Root"; exit 1; }
+
 if [[ "$FORMAT_EFI" == "yes" ]]; then
-    mkfs.vfat -F32 "$EFI_PART" &>/dev/null
+    mkfs.vfat -F32 "$EFI_PART" &>/dev/null || { echo -e "${ICON_ERR} Failed to format EFI"; exit 1; }
 fi
 
 echo -e "${ICON_INF} Mounting Partitions..."
-mount "$ROOT_PART" /mnt
+# [CRITICAL FIX] Added error checking. If mount fails, installation stops.
+mount "$ROOT_PART" /mnt || { echo -e "${ICON_ERR} Failed to mount Root"; exit 1; }
 mkdir -p /mnt/boot
-mount "$EFI_PART" /mnt/boot
+mount "$EFI_PART" /mnt/boot || { echo -e "${ICON_ERR} Failed to mount EFI"; exit 1; }
 
 echo -e "${ICON_INF} Detecting CPU..."
 if grep -q "AuthenticAMD" /proc/cpuinfo; then
@@ -497,15 +498,19 @@ while true; do
 done
 echo ""
 
-export SWAP_SIZE
+# Variables used in heredoc are expanded by the parent shell before chroot
+# Export is not strictly necessary but good for debugging if needed
+export SWAP_SIZE TIMEZONE LOCALE KEYMAP MY_HOSTNAME MY_USER MY_PASS
 
 echo -e "${ICON_INF} Configuring System Internals..."
 
+# [FIX] Added explicit error checking logic via commands inside chroot
 arch-chroot /mnt /bin/bash <<EOF
 ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
 hwclock --systohc &>/dev/null
 
-sed -i "s/^#$LOCALE/$LOCALE/" /etc/locale.gen
+# [FIX] Safer locale generation than sed
+echo "$LOCALE UTF-8" > /etc/locale.gen
 locale-gen &>/dev/null
 echo "LANG=$LOCALE" > /etc/locale.conf
 echo "KEYMAP=$KEYMAP" > /etc/vconsole.conf
@@ -520,7 +525,13 @@ chmod 440 /etc/sudoers.d/00_arch_installer
 
 pacman -S --noconfirm grub efibootmgr os-prober &>/dev/null
 echo "GRUB_DISABLE_OS_PROBER=false" >> /etc/default/grub
+
+# [FIX] Ensure Grub install success
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=Arch &>/dev/null
+if [ \$? -ne 0 ]; then
+    echo "GRUB INSTALL FAILED" > /boot/grub_failure.log
+fi
+
 grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
 
 systemctl enable NetworkManager &>/dev/null
@@ -541,6 +552,13 @@ echo "set tabstospaces" >> "/home/$MY_USER/.nanorc"
 chown "$MY_USER:$MY_USER" "/home/$MY_USER/.nanorc"
 EOF
 
+# Safety check for grub failure
+if [ -f /mnt/boot/grub_failure.log ]; then
+    echo -e "${ICON_ERR} Bootloader installation failed!"
+    echo -e "${DIM} You may need to manually chroot and check efibootmgr.${NC}"
+    exit 1
+fi
+
 unset MY_PASS P1 P2
 DISK_MODIFIED=0
 
@@ -550,7 +568,7 @@ DISK_MODIFIED=0
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${CYAN}${BOLD}   INSTALLATION SUCCESSFUL v2.4.0 ${NC}"
+echo -e "${CYAN}${BOLD}    INSTALLATION SUCCESSFUL v2.4.1 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

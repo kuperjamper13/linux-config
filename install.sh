@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v2.4.0
+#  ARCH LINUX UNIVERSAL INSTALLER v1.1.0
 #  Installing arch the easy way.
 # ==============================================================================
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER - ENTERPRISE EDITION v3.1.0 (UI/UX POLISH)
+#  ARCH LINUX UNIVERSAL INSTALLER - ENTERPRISE EDITION v3.2.0
 #  
 #  DESCRIPTION: Automated, menu-driven Arch Linux installation utility.
 #  AUTHOR:      System Administrator
@@ -71,56 +71,34 @@ hard_clear() {
     printf "\033c"
 }
 
-# New: Dynamic Separator Line
-print_line() {
-    local color="${1:-$CYAN}"
-    local width
-    width=$(tput cols 2>/dev/null || echo 80)
-    # Print a line of '═' spanning the full width
-    printf "${color}%*s${NC}\n" "$width" '' | tr ' ' '═'
-}
-
-# New: Loading Spinner for better UX
-spinner() {
-    local pid=$1 # Optional: if passed, spin until PID dies. If not, spin for $2 seconds.
-    local duration=${2:-2}
+# Safe, time-based animation that cannot get stuck
+visual_sleep() {
+    local duration=${1:-1}
     local delay=0.1
     local spinstr='|/-\'
+    local loops=$(( duration * 10 ))
     
     tput civis 2>/dev/null || true
-    
-    if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
-        while kill -0 "$pid" 2>/dev/null; do
-            local temp=${spinstr#?}
-            printf " [%c]  " "$spinstr"
-            local spinstr=$temp${spinstr%"$temp"}
-            sleep $delay
-            printf "\b\b\b\b\b\b"
-        done
-    else
-        # Time based spin
-        local end=$((SECONDS + duration))
-        while [ $SECONDS -lt $end ]; do
-            local temp=${spinstr#?}
-            printf " [%c]  " "$spinstr"
-            local spinstr=$temp${spinstr%"$temp"}
-            sleep $delay
-            printf "\b\b\b\b\b\b"
-        done
-    fi
-    printf "      \b\b\b\b\b\b"
+    for (( i=0; i<loops; i++ )); do
+        local temp=${spinstr#?}
+        printf " [%c]  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "      \b\b\b\b\b\b" # Clear spinner
     tput cnorm 2>/dev/null || true
 }
 
 print_banner() {
     echo -e "${MAGENTA}"
-    echo " ▄▄▄      ██████╗  ████████╗ ██╗  ██╗"
-    echo " ████╗    ██╔══██╗ ██╔═════╝ ██║  ██║"
-    echo " ██╔██╗   ██████╔╝ ██║       ███████║"
-    echo " ██║╚██╗  ██╔══██╗ ██║       ██╔══██║"
-    echo " ██║ ╚██╗ ██║  ██║ ████████╗ ██║  ██║"
-    echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v3.1.0"
+    echo " ▄▄▄       ██████╗  ████████╗ ██╗  ██╗"
+    echo " ████╗     ██╔══██╗ ██╔═════╝ ██║  ██║"
+    echo " ██╔██╗    ██████╔╝ ██║        ███████║"
+    echo " ██║╚██╗   ██╔══██╗ ██║        ██╔══██║"
+    echo " ██║ ╚██╗  ██║  ██║ ████████╗ ██║  ██║"
+    echo " ╚═╝  ╚═╝  ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v3.2.0"
     echo "  >> ENTERPRISE EDITION"
     echo -e "${NC}"
 }
@@ -131,10 +109,9 @@ start_step() {
     log "STEP START: $step_num - $step_name"
     hard_clear
     print_banner
-    print_line "$CYAN"
-    echo -e " ${BOLD}STEP $step_num${NC} :: ${WHITE}$step_name${NC}"
-    print_line "$CYAN"
-    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD} STEP $step_num :: ${WHITE}$step_name ${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}\n"
 }
 
 ask_input() {
@@ -143,9 +120,8 @@ ask_input() {
     local default_val="${3:-}"
     local input_val
     
-    # Improved visual hierarchy for inputs
     if [[ -n "$default_val" ]]; then
-        echo -ne "${YELLOW}${BOLD} ➜ ${NC}${WHITE}$prompt_text${NC} ${DIM}[Default: $default_val]${NC}: "
+        echo -ne "${YELLOW}${BOLD} ➜ ${NC}${WHITE}$prompt_text${NC} ${DIM}[$default_val]${NC}: "
     else
         echo -ne "${YELLOW}${BOLD} ➜ ${NC}${WHITE}$prompt_text${NC}: "
     fi
@@ -187,28 +163,28 @@ print_menu_grid() {
 
 show_progress_bar() {
     local pid=$1
-    local width=40
+    local width=30
     local i=0
     local direction=1
     
     tput civis 2>/dev/null || true
-    echo -ne "\n  ${BOLD}Status:${NC} ["
+    echo -ne "\n  ${BOLD}Installing:${NC} ["
     
     while kill -0 "$pid" 2>/dev/null; do
         local bar=""
         for ((j=0; j<width; j++)); do
-            if [ $j -eq $i ]; then bar+="█"; else bar+="."; fi
+            if [ $j -eq $i ]; then bar+="<=>"; else bar+=" "; fi
         done
-        printf "\r  ${BOLD}Status:${NC} [${CYAN}%-${width}s${NC}]" "${bar:0:$width}"
+        printf "\r  ${BOLD}Installing:${NC} [${CYAN}%-${width}s${NC}]" "${bar:0:$width}"
         
         i=$((i + direction))
-        if [ $i -ge $((width - 1)) ] || [ $i -le 0 ]; then direction=$((direction * -1)); fi
-        sleep 0.05
+        if [ $i -ge $((width - 3)) ] || [ $i -le 0 ]; then direction=$((direction * -1)); fi
+        sleep 0.1
     done
     
-    local full_bar=$(printf '█%.0s' $(seq 1 $width))
-    printf "\r  ${BOLD}Status:${NC} [${GREEN}$full_bar${NC}] ${BOLD}Done${NC}   \n"
-    sleep 0.5
+    local full_bar=$(printf '=%0.s' $(seq 1 $width))
+    printf "\r  ${BOLD}Installing:${NC} [${CYAN}$full_bar${NC}] Done\n"
+    sleep 1
     tput cnorm 2>/dev/null || true
 }
 
@@ -244,7 +220,7 @@ start_step "1" "SYSTEM IDENTITY CONFIGURATION"
 echo -e "${ICON_INF} Configure the network identity for this machine."
 ask_input "MY_HOSTNAME" "Enter Hostname" "$HOSTNAME_DEFAULT"
 echo -e "${ICON_OK} Hostname set to: ${BOLD}$MY_HOSTNAME${NC}"
-spinner 0 1 # Aesthetic pause
+visual_sleep 0.5
 
 # ==============================================================================
 # SECTION 2: REGIONAL SETTINGS
@@ -320,7 +296,7 @@ while true; do
         echo -e "${ICON_ERR} Invalid Timezone: $REGION/$CITY does not exist."
     fi
 done
-spinner 0 1
+visual_sleep 0.5
 
 # ==============================================================================
 # SECTION 3: NETWORK CONNECTIVITY
@@ -347,7 +323,7 @@ else
         read -p "Press Enter to continue..."
     else
         echo -e "${ICON_INF} Scanning on Interface: ${BOLD}$WIFI_INTERFACE${NC}"
-        spinner 0 2
+        visual_sleep 1
         iwctl station "$WIFI_INTERFACE" scan
         
         echo -e "\n${CYAN}:: Available Networks ::${NC}"
@@ -366,7 +342,7 @@ else
             iwctl --passphrase "$WIFI_PASS" station "$WIFI_INTERFACE" connect "$WIFI_SSID"
             
             echo -e "${ICON_INF} Verifying Handshake (8s timeout)..."
-            spinner 0 8
+            visual_sleep 3
             
             if check_connection; then
                 echo -e "${ICON_OK} ${GREEN}Connection Established Successfully.${NC}"
@@ -380,7 +356,7 @@ else
         done
     fi
 fi
-sleep 0.5
+visual_sleep 0.5
 
 # ==============================================================================
 # SECTION 4: STORAGE ARCHITECTURE
@@ -412,7 +388,7 @@ while true; do
 done
 
 echo -e "\n${ICON_INF} Running Hardware Analysis..."
-spinner 0 1
+visual_sleep 1
 TOTAL_RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
 TOTAL_RAM_GB=$(($TOTAL_RAM_KB / 1024 / 1024))
 CORES=$(nproc)
@@ -444,7 +420,7 @@ while true; do
     case $STRATEGY_OPT in
         1)
             echo -e "${ICON_INF} Analyzing Disk Topology..."
-            spinner 0 2
+            visual_sleep 1
             if sgdisk -p "$TARGET_DISK" | grep -i "Total free space" | grep -q "0.0 B"; then
                  echo -e "${ICON_ERR} No free space available on disk."
                  log "STORAGE: Free space strategy selected but 0 bytes free."
@@ -490,7 +466,7 @@ while true; do
             [[ "$CONFIRM" != "DESTROY" ]] && echo "Aborted." && exit 1
             
             echo -e "${ICON_INF} Scrubbing Disk Layout..."
-            spinner 0 2
+            visual_sleep 1
             sgdisk -Z "$TARGET_DISK" &>/dev/null
             sgdisk -a 2048 -n 1:0:+512M -t 1:ef00 -c 1:"EFI System" "$TARGET_DISK" &>/dev/null
             sgdisk -a 2048 -n 2:0:0     -t 2:8304 -c 2:"Arch Root"  "$TARGET_DISK" &>/dev/null
@@ -607,7 +583,7 @@ fi
 
 echo -e "${ICON_INF} Generating fstab..."
 genfstab -U "$MOUNT_POINT" >> "$MOUNT_POINT/etc/fstab"
-spinner 0 1
+visual_sleep 1
 
 # ==============================================================================
 # SECTION 6: SYSTEM CONFIGURATION (CHROOT)
@@ -635,7 +611,7 @@ echo ""
 export SWAP_SIZE CORES MY_HOSTNAME LOCALE KEYMAP TIMEZONE MY_USER MY_PASS
 
 echo -e "${ICON_INF} Configuring System Internals..."
-spinner 0 2
+visual_sleep 2
 
 # Begin Chroot Operations
 arch-chroot "$MOUNT_POINT" /bin/bash <<EOF

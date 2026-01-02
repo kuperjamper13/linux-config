@@ -41,7 +41,7 @@ function show_header {
     echo "  ░    ▒     ░░   ░ ░          ░  ░░ ░"
     echo "       ░  ░   ░      ░ ░       ░  ░  ░"
     echo -e "${NC}"
-    echo -e "${CYAN}   // ARCH LINUX INSTALLER v4.3 (STABLE) //${NC}"
+    echo -e "${CYAN}   // ARCH LINUX INSTALLER v5.0 (GOLD MASTER) //${NC}"
     draw_line
 }
 
@@ -258,8 +258,7 @@ elif [ "$STRATEGY" == "1" ]; then
     sync
     sleep 2
     
-    # FIX: Extract PATH (Column 1) instead of Label Name (Column 2/3)
-    # This prevents the "Root: Linux" error when spaces exist in the label
+    # FIX: Extract PATH (Column 1)
     ROOT_PART=$(lsblk -n -o PATH,PARTLABEL $TARGET_DISK | grep "Arch Linux Root" | tail -n1 | awk '{print $1}')
     
     if [[ -z "$ROOT_PART" ]]; then
@@ -298,7 +297,6 @@ else
 fi
 
 # 4. FINAL VERIFICATION LOOP
-# Verify partitions actually exist before proceeding
 if [ ! -b "$ROOT_PART" ] || [ ! -b "$EFI_PART" ]; then
     echo -e "\n${ICON_ERR} CRITICAL ERROR: Defined partition does not exist."
     echo -e "Root: $ROOT_PART"
@@ -354,8 +352,9 @@ fi
 
 # Pacstrap
 echo -e "${ICON_INF} Installing Packages..."
+# Added 'bluez bluez-utils' for Bluetooth support
 pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel clang git networkmanager nano \
-    $MICROCODE mesa pipewire pipewire-alsa pipewire-pulse wireplumber power-profiles-daemon &>/dev/null
+    $MICROCODE mesa pipewire pipewire-alsa pipewire-pulse wireplumber power-profiles-daemon bluez bluez-utils &>/dev/null
 
 echo -e "${ICON_INF} Generating Fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
@@ -383,8 +382,9 @@ done
 
 export TIMEZONE LOCALE KEYMAP MY_HOSTNAME MY_USER MY_PASS
 
-echo -e "${ICON_INF} Configuring System..."
+echo -e "${ICON_INF} Configuring System Internals..."
 arch-chroot /mnt /bin/bash <<EOF
+# --- 1. LOCALES & TIME ---
 ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
 hwclock --systohc
 echo "$LOCALE UTF-8" > /etc/locale.gen
@@ -393,27 +393,36 @@ echo "LANG=$LOCALE" > /etc/locale.conf
 echo "KEYMAP=$KEYMAP" > /etc/vconsole.conf
 echo "$MY_HOSTNAME" > /etc/hostname
 
+# --- 2. USERS & SUDO ---
 echo "root:$MY_PASS" | chpasswd
 useradd -m -G wheel,storage,power -s /bin/bash $MY_USER
 echo "$MY_USER:$MY_PASS" | chpasswd
 echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
 
+# --- 3. BOOTLOADER ---
 pacman -S --noconfirm grub efibootmgr os-prober > /dev/null
 echo "GRUB_DISABLE_OS_PROBER=false" >> /etc/default/grub
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=Arch > /dev/null
 grub-mkconfig -o /boot/grub/grub.cfg > /dev/null
 
+# --- 4. SERVICES ---
 systemctl enable NetworkManager
 systemctl enable power-profiles-daemon
+systemctl enable bluetooth   # Enable Bluetooth
+systemctl enable fstrim.timer # Enable SSD Health
 
-# Swapfile (4GB)
+# --- 5. PERFORMANCE ---
+# Set Compilation to use ALL cores (Speeds up AUR installs)
+sed -i "s/#MAKEFLAGS=\"-j2\"/MAKEFLAGS=\"-j\$(nproc)\"/" /etc/makepkg.conf
+
+# --- 6. SWAPFILE (4GB) ---
 dd if=/dev/zero of=/swapfile bs=1G count=4 status=none
 chmod 600 /swapfile
 mkswap /swapfile > /dev/null
 swapon /swapfile
 echo "/swapfile none swap defaults 0 0" >> /etc/fstab
 
-# Nano Config
+# --- 7. QUALITY OF LIFE ---
 echo "set tabsize 4" > /home/$MY_USER/.nanorc
 echo "set tabstospaces" >> /home/$MY_USER/.nanorc
 chown $MY_USER:$MY_USER /home/$MY_USER/.nanorc
@@ -424,3 +433,4 @@ echo -e "${GREEN}   INSTALLATION COMPLETE                ${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo -e "1. Remove installation media."
 echo -e "2. Type 'reboot'."
+echo -e "3. Login as ${BOLD}$MY_USER${NC}."

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v1.0.0
-#  Final Release | Stable Engine | Clean UI
+#  ARCH LINUX UNIVERSAL INSTALLER v1.0.1
+#  Final Release | Clean UI | Visual Progress Bar
 # ==============================================================================
 
 # --- [1] VISUAL LIBRARY -------------------------------------------------------
@@ -29,13 +29,13 @@ function hard_clear {
 
 function print_banner {
     echo -e "${MAGENTA}"
-    echo " ▄▄▄      ██████╗  ███████╗ ██╗  ██╗"
-    echo " ████╗    ██╔══██╗ ██╔════╝ ██║  ██║"
-    echo " ██╔██╗   ██████╔╝ ██║      ███████║"
-    echo " ██║╚██╗  ██╔══██╗ ██║      ██╔══██║"
-    echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
-    echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.0.0"
+    echo " ▄▄▄        ██████╗  ████████╗ ██╗  ██╗"
+    echo " ████╗      ██╔══██╗ ██╔═════╝ ██║  ██║"
+    echo " ██╔██╗     ██████╔╝ ██║       ███████║"
+    echo " ██║╚██╗    ██╔══██╗ ██║       ██╔══██║"
+    echo " ██║ ╚██╗   ██║  ██║ ████████╗ ██║  ██║"
+    echo " ╚═╝  ╚═╝   ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.0.1"
     echo -e "${NC}"
 }
 
@@ -86,6 +86,51 @@ function print_menu_grid {
         echo ""
     done
     echo ""
+}
+
+# --- [3] ANIMATION UTILITIES --------------------------------------------------
+function show_progress_bar {
+    # Displays an indeterminate "bouncer" progress bar while PID is running
+    local pid=$1
+    local delay=0.1
+    local width=30
+    local i=0
+    local direction=1
+    
+    # Hide cursor
+    tput civis
+    
+    echo -ne "\n  ${BOLD}Installing:${NC} ["
+    
+    while ps -p $pid > /dev/null; do
+        # Build the bar string
+        local bar=""
+        for ((j=0; j<width; j++)); do
+            if [ $j -eq $i ]; then
+                bar+="<=>"
+            else
+                bar+=" "
+            fi
+        done
+        
+        # Print the bar (using \r to overwrite line)
+        # Using substring to keep bar length fixed in case of overflow logic
+        printf "\r  ${BOLD}Installing:${NC} [${CYAN}%-${width}s${NC}]" "${bar:0:$width}"
+        
+        # Move the bouncer
+        i=$((i + direction))
+        if [ $i -ge $((width - 3)) ] || [ $i -le 0 ]; then
+            direction=$((direction * -1))
+        fi
+        
+        sleep $delay
+    done
+    
+    # Finalize bar
+    printf "\r  ${BOLD}Installing:${NC} [${GREEN}%-${width}s${NC}]\n" "$(printf '=%0.s' {1..30})"
+    
+    # Restore cursor
+    tput cnorm
 }
 
 # ==============================================================================
@@ -389,14 +434,31 @@ else
     echo -e "${ICON_OK} Intel CPU Detected."
 fi
 
-# 5.5 Base Install
-echo -e "${ICON_INF} Installing Base System (This may take time)..."
+# 5.5 Base Install (BACKGROUNDED + PROGRESS BAR)
+echo -e "${ICON_INF} Installing Base System..."
+echo -e "${DIM} (Logs available at /tmp/arch-install.log)${NC}"
+
+# Run installation in background, log output to file for debugging if needed
 pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
     $UCODE mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
     networkmanager bluez bluez-utils power-profiles-daemon \
-    git nano ntfs-3g dosfstools mtools &>/dev/null
+    git nano ntfs-3g dosfstools mtools &> /tmp/arch-install.log &
 
-echo -e "${ICON_OK} Core packages installed."
+# Capture PID of pacstrap
+INSTALL_PID=$!
+
+# Show the Progress Animation while PID runs
+show_progress_bar $INSTALL_PID
+
+# Check if it succeeded
+wait $INSTALL_PID
+if [ $? -eq 0 ]; then
+    echo -e "${ICON_OK} Core packages installed."
+else
+    echo -e "\n${ICON_ERR} Installation Failed. Check /tmp/arch-install.log"
+    exit 1
+fi
+
 echo -e "${ICON_INF} Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
 
@@ -418,7 +480,9 @@ done
 export TIMEZONE LOCALE KEYMAP MY_HOSTNAME MY_USER MY_PASS
 
 echo -e "${ICON_INF} Configuring System Internals..."
+
 # SILENCED CHROOT COMMANDS for cleaner UI
+# Using &> /dev/null on commands that emit status text
 arch-chroot /mnt /bin/bash <<EOF
 ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
 hwclock --systohc &>/dev/null
@@ -438,10 +502,10 @@ echo "GRUB_DISABLE_OS_PROBER=false" >> /etc/default/grub
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=Arch &>/dev/null
 grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
 
-systemctl enable NetworkManager
-systemctl enable power-profiles-daemon
-systemctl enable bluetooth
-systemctl enable fstrim.timer
+systemctl enable NetworkManager &>/dev/null
+systemctl enable power-profiles-daemon &>/dev/null
+systemctl enable bluetooth &>/dev/null
+systemctl enable fstrim.timer &>/dev/null
 
 sed -i "s/#MAKEFLAGS=\"-j2\"/MAKEFLAGS=\"-j\$(nproc)\"/" /etc/makepkg.conf
 
@@ -462,7 +526,7 @@ EOF
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.0.0 ${NC}"
+echo -e "${WHITE}${BOLD}   INSTALLATION SUCCESSFUL v1.0.1 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

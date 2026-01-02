@@ -1,16 +1,26 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v2.2.0
-#  Performance Edition | Dynamic Swap | Mirror Reflector
+#  ARCH LINUX UNIVERSAL INSTALLER v2.3.0
+#  Platinum Edition | Edge-Case Hardened | Production Ready
 # ==============================================================================
 
 # --- [0] SAFETY PRE-FLIGHT ----------------------------------------------------
 # Strict Mode: Error on unset variables, fail on pipe errors
 set -uo pipefail
 
-# Trap: Restore cursor even if script crashes or user Ctrl+C
-trap 'tput cnorm; exit' EXIT
+# Global State for Trap
+DISK_MODIFIED=0
+
+# Trap Function: Restores cursor and warns if disk was left dirty
+cleanup() {
+    tput cnorm
+    if [[ "$DISK_MODIFIED" -eq 1 ]]; then
+        echo -e "\n${YELLOW} WARN ${NC} Script stopped after disk modification."
+        echo -e "${DIM} The system may be in a partial or unbootable state.${NC}"
+    fi
+}
+trap cleanup EXIT
 
 # --- [1] VISUAL LIBRARY -------------------------------------------------------
 NC='\033[0m'
@@ -42,8 +52,8 @@ function print_banner {
     echo " ██║╚██╗    ██╔══██╗ ██║       ██╔══██║"
     echo " ██║ ╚██╗   ██║  ██║ ████████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝   ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.2.0"
-    echo "  >> PERFORMANCE EDITION"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.3.0"
+    echo "  >> PLATINUM EDITION"
     echo -e "${NC}"
 }
 
@@ -174,7 +184,8 @@ done
 
 # 2.3 Timezone
 echo -e "\n${ICON_INF} Select Timezone Region"
-mapfile -t regions < <(find /usr/share/zoneinfo -maxdepth 1 -type d | cut -d/ -f5 | grep -vE "posix|right|Etc|SystemV|iso3166|Arctic|Antarctica|^$")
+# PRO FIX: Use directory-agnostic find method
+mapfile -t regions < <(cd /usr/share/zoneinfo && find . -maxdepth 1 -type d ! -name . -printf '%P\n' | sort)
 print_menu_grid regions
 
 while true; do
@@ -289,7 +300,6 @@ TOTAL_RAM_GB=$(($TOTAL_RAM_KB / 1024 / 1024))
 
 echo -e "   [RAM]  Detected ${BOLD}${TOTAL_RAM_GB}GB${NC} System Memory."
 
-# LOGIC FIX: Variable SWAP_SIZE setting
 if [ $TOTAL_RAM_GB -ge 8 ]; then
     echo -e "          -> Strategy: Standard Swapfile (4GB)."
     SWAP_SIZE=4
@@ -369,6 +379,14 @@ while true; do
             ask_input "E_IN" "Select EFI Partition"
             EFI_PART="/dev/${E_IN#/dev/}"
             ask_input "FORMAT_EFI" "Format EFI? (yes/no)"
+            
+            # PRO FIX: Safety warning for manual EFI format
+            if [[ "$FORMAT_EFI" == "yes" ]]; then
+                echo -e "${YELLOW}WARNING: Formatting EFI will delete all other bootloaders (Windows/Fedora)!${NC}"
+                ask_input "EFI_CONFIRM" "Are you sure?"
+                [[ "$EFI_CONFIRM" != "yes" ]] && FORMAT_EFI="no"
+            fi
+            
             ask_input "R_IN" "Select Root Partition"
             ROOT_PART="/dev/${R_IN#/dev/}"
             break
@@ -398,9 +416,14 @@ ask_input "CONFIRM" "Type 'yes' to proceed with installation"
 # ==============================================================================
 start_step "5" "CORE INSTALLATION"
 
-# PERF FIX: Add Reflector for mirror optimization (Silent & Safe)
-echo -e "${ICON_INF} Optimizing Mirrors (Reflector)..."
-reflector --latest 20 --protocol https --sort rate --save /etc/pacman.d/mirrorlist &>/dev/null || true
+# PRO FIX: Mark disk as modified for trap handler
+DISK_MODIFIED=1
+
+# PRO FIX: Safe Reflector check
+if command -v reflector &>/dev/null; then
+    echo -e "${ICON_INF} Optimizing Mirrors (Reflector)..."
+    reflector --latest 20 --protocol https --sort rate --save /etc/pacman.d/mirrorlist &>/dev/null || true
+fi
 
 echo -e "${ICON_INF} Optimizing Pacman (Parallel Downloads)..."
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
@@ -428,7 +451,6 @@ fi
 echo -e "${ICON_INF} Installing Base System..."
 echo -e "${DIM} (Logs available at /tmp/arch-install.log)${NC}"
 
-# Using standard 'linux' kernel for reliability
 pacstrap /mnt base linux linux-headers linux-firmware base-devel \
     "$UCODE" mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
     networkmanager bluez bluez-utils power-profiles-daemon \
@@ -477,8 +499,9 @@ export SWAP_SIZE
 
 echo -e "${ICON_INF} Configuring System Internals..."
 
+# PRO FIX: Quoted variables inside Heredoc for safety
 arch-chroot /mnt /bin/bash <<EOF
-ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
+ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
 hwclock --systohc &>/dev/null
 
 sed -i "s/^#$LOCALE/$LOCALE/" /etc/locale.gen
@@ -488,7 +511,7 @@ echo "KEYMAP=$KEYMAP" > /etc/vconsole.conf
 echo "$MY_HOSTNAME" > /etc/hostname
 
 echo "root:$MY_PASS" | chpasswd
-useradd -m -G wheel,storage,power,video -s /bin/bash $MY_USER
+useradd -m -G wheel,storage,power,video -s /bin/bash "$MY_USER"
 echo "$MY_USER:$MY_PASS" | chpasswd
 
 echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/00_arch_installer
@@ -506,7 +529,6 @@ systemctl enable fstrim.timer &>/dev/null
 
 sed -i "s/#MAKEFLAGS=\"-j2\"/MAKEFLAGS=\"-j\$(nproc)\"/" /etc/makepkg.conf
 
-# LOGIC FIX: Use the calculated swap size variable
 dd if=/dev/zero of=/swapfile bs=1G count=$SWAP_SIZE status=none
 chmod 600 /swapfile
 mkswap /swapfile &>/dev/null
@@ -514,12 +536,15 @@ swapon /swapfile &>/dev/null
 echo "/swapfile none swap defaults 0 0" >> /etc/fstab
 
 # Setup nano for user
-echo "set tabsize 4" > /home/$MY_USER/.nanorc
-echo "set tabstospaces" >> /home/$MY_USER/.nanorc
-chown $MY_USER:$MY_USER /home/$MY_USER/.nanorc
+echo "set tabsize 4" > "/home/$MY_USER/.nanorc"
+echo "set tabstospaces" >> "/home/$MY_USER/.nanorc"
+chown "$MY_USER:$MY_USER" "/home/$MY_USER/.nanorc"
 EOF
 
 unset MY_PASS P1 P2
+
+# Flag success so trap doesn't warn
+DISK_MODIFIED=0
 
 # ==============================================================================
 # FINALIZATION
@@ -527,7 +552,7 @@ unset MY_PASS P1 P2
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${WHITE}${BOLD}   INSTALLATION SUCCESSFUL v2.2.0 ${NC}"
+echo -e "${WHITE}${BOLD}   INSTALLATION SUCCESSFUL v2.3.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

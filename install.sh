@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v1.9.0
-#  Performance Edition | Visual Progress | Auto-Mirrors
+#  ARCH LINUX UNIVERSAL INSTALLER v1.9.1
+#  Hotfix: Fixed Pacstrap Syntax | Performance Edition
 # ==============================================================================
 
 # --- [1] VISUAL LIBRARY -------------------------------------------------------
@@ -29,13 +29,13 @@ function hard_clear {
 
 function print_banner {
     echo -e "${MAGENTA}"
-    echo " ▄▄▄      ██████╗  ███████╗ ██╗  ██╗"
-    echo " ████╗    ██╔══██╗ ██╔════╝ ██║  ██║"
-    echo " ██╔██╗   ██████╔╝ ██║      ███████║"
-    echo " ██║╚██╗  ██╔══██╗ ██║      ██╔══██║"
-    echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
-    echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.9.0"
+    echo " ▄▄▄       ██████╗  ███████╗ ██╗  ██╗"
+    echo " ████╗     ██╔══██╗ ██╔════╝ ██║  ██║"
+    echo " ██╔██╗    ██████╔╝ ██║      ███████║"
+    echo " ██║╚██╗   ██╔══██╗ ██║      ██╔══██║"
+    echo " ██║ ╚██╗  ██║  ██║ ███████╗ ██║  ██║"
+    echo " ╚═╝  ╚═╝  ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.9.1"
     echo -e "${NC}"
 }
 
@@ -361,7 +361,6 @@ start_step "5" "CORE INSTALLATION"
 
 # 5.1 Optimization & Mirror Ranking
 echo -e "${ICON_INF} Optimizing Mirrors (Finding fastest servers)..."
-# This prevents the "slow download" issue by finding the top 5 fastest mirrors
 reflector --verbose --latest 5 --sort rate --save /etc/pacman.d/mirrorlist &>/dev/null
 sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 
@@ -399,8 +398,8 @@ fi
 echo -e "${ICON_INF} Downloading Base System..."
 echo -e "${DIM} (Output visible to track progress)${NC}"
 
-# REMOVED '&>/dev/null' so you can see the progress bars!
-pacstrap -K --noconfirm /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
+# FIX: Removed invalid '--noconfirm' flag from pacstrap. It is default.
+pacstrap -K /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
     $UCODE mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
     networkmanager bluez bluez-utils power-profiles-daemon \
     git nano ntfs-3g dosfstools mtools || { echo -e "\n${ICON_ERR} Installation Failed."; exit 1; }
@@ -470,7 +469,7 @@ EOF
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.9.0 ${NC}"
+echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.9.1 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

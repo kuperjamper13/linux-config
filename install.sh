@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v2.1.0
-#  Modern UI (v1.9) | Classic Install Engine (v1.3)
+#  ARCH LINUX UNIVERSAL INSTALLER v1.0.0
+#  Final Release | Stable Engine | Clean UI
 # ==============================================================================
 
 # --- [1] VISUAL LIBRARY -------------------------------------------------------
@@ -35,7 +35,7 @@ function print_banner {
     echo " ██║╚██╗  ██╔══██╗ ██║      ██╔══██║"
     echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.1.0"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.0.0"
     echo -e "${NC}"
 }
 
@@ -355,7 +355,7 @@ ask_input "CONFIRM" "Type 'yes' to proceed with installation"
 [[ "$CONFIRM" != "yes" ]] && exit 1
 
 # ==============================================================================
-# SECTION 5: INSTALLATION PROCESS (CLASSIC ENGINE v1.3/v1.5)
+# SECTION 5: INSTALLATION PROCESS
 # ==============================================================================
 start_step "5" "CORE INSTALLATION"
 
@@ -417,12 +417,13 @@ done
 
 export TIMEZONE LOCALE KEYMAP MY_HOSTNAME MY_USER MY_PASS
 
-echo -e "${ICON_INF} Configuring System Internals (Chroot)..."
+echo -e "${ICON_INF} Configuring System Internals..."
+# SILENCED CHROOT COMMANDS for cleaner UI
 arch-chroot /mnt /bin/bash <<EOF
 ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
-hwclock --systohc
+hwclock --systohc &>/dev/null
 echo "$LOCALE UTF-8" > /etc/locale.gen
-locale-gen > /dev/null
+locale-gen &>/dev/null
 echo "LANG=$LOCALE" > /etc/locale.conf
 echo "KEYMAP=$KEYMAP" > /etc/vconsole.conf
 echo "$MY_HOSTNAME" > /etc/hostname
@@ -432,10 +433,10 @@ useradd -m -G wheel,storage,power,video -s /bin/bash $MY_USER
 echo "$MY_USER:$MY_PASS" | chpasswd
 echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
 
-pacman -S --noconfirm grub efibootmgr os-prober > /dev/null
+pacman -S --noconfirm grub efibootmgr os-prober &>/dev/null
 echo "GRUB_DISABLE_OS_PROBER=false" >> /etc/default/grub
-grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=Arch > /dev/null
-grub-mkconfig -o /boot/grub/grub.cfg > /dev/null
+grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=Arch &>/dev/null
+grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
 
 systemctl enable NetworkManager
 systemctl enable power-profiles-daemon
@@ -446,8 +447,8 @@ sed -i "s/#MAKEFLAGS=\"-j2\"/MAKEFLAGS=\"-j\$(nproc)\"/" /etc/makepkg.conf
 
 dd if=/dev/zero of=/swapfile bs=1G count=4 status=none
 chmod 600 /swapfile
-mkswap /swapfile > /dev/null
-swapon /swapfile
+mkswap /swapfile &>/dev/null
+swapon /swapfile &>/dev/null
 echo "/swapfile none swap defaults 0 0" >> /etc/fstab
 
 echo "set tabsize 4" > /home/$MY_USER/.nanorc
@@ -461,7 +462,7 @@ EOF
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v2.1.0 ${NC}"
+echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.0.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

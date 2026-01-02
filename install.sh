@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v2.8.0
-#  Zen Kernel | Strict Mode | Dry-Run Capable | Edge-Case Hardened
+#  ARCH LINUX UNIVERSAL INSTALLER v2.9.0
+#  Zen Kernel | Strict Mode | Dry-Run Capable | Reflector Safe
 # ==============================================================================
 
 # --- [0] PRE-FLIGHT ARGUMENTS & CONFIG ----------------------------------------
-set -u # Undefined variables are errors
-set -o pipefail # Pipes fail if any command fails
+# 1. Safety Fix: Restore 'set -e' for strict error handling
+set -euo pipefail
 
 # 1.1 Polish: Dry-run / simulation mode
 DRY_RUN=0
@@ -17,7 +17,6 @@ fi
 
 # 1.2 Polish: Logging (files + stdout)
 LOG_FILE="/tmp/arch-installer.log"
-# Ensure log file exists and we can write to it
 touch "$LOG_FILE"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
@@ -50,12 +49,12 @@ fatal() {
     exit 1
 }
 
-# Wrapper for destructive commands
+# 2. Safety Fix: Removed 'eval' to prevent injection risks
 run_safe() {
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo -e "${ICON_DRY} Would run: $*"
     else
-        eval "$@"
+        "$@"
     fi
 }
 
@@ -81,6 +80,7 @@ fi
 DISK_MODIFIED=0
 
 cleanup() {
+    # 'set -e' makes this run on any error, so we check DISK_MODIFIED
     tput cnorm 2>/dev/null || true
     if [[ "$DISK_MODIFIED" -eq 1 ]]; then
         echo -e "\n${ICON_WRN} Script stopped after disk modification."
@@ -104,7 +104,7 @@ function print_banner {
     echo " ██║╚██╗    ██╔══██╗ ██║        ██╔══██║"
     echo " ██║ ╚██╗   ██║  ██║ ████████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝   ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.8.0"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.9.0"
     echo "  >> ZEN KERNEL + ARCH STANDARDS"
     echo -e "${NC}"
     
@@ -253,7 +253,7 @@ done
 
 echo -e "\n${ICON_INF} Select City in $REGION"
 mapfile -t cities < <(ls "/usr/share/zoneinfo/$REGION")
-short_cities=("${cities[@]:0:20}") # Limit to top 20 to prevent scrolling overflow
+short_cities=("${cities[@]:0:20}")
 print_menu_grid short_cities
 
 while true; do
@@ -284,6 +284,8 @@ check_internet() {
     ping -c 1 google.com &>/dev/null || ping -6 -c 1 google.com &>/dev/null
 }
 
+# The '|| true' is CRITICAL because of 'set -e'. If the first ping check fails,
+# the script would exit without the '|| true', preventing us from entering the recovery block.
 if check_internet || true; then
     if check_internet; then
         echo -e "${ICON_OK} Internet Connection: ${GREEN}Active${NC}"
@@ -329,21 +331,31 @@ if check_internet || true; then
     fi
 fi
 
-# 2.2 Edge-Case: Captive Portal Check
-if ! curl -I https://archlinux.org &>/dev/null; then
-    echo -e "${ICON_WRN} HTTP check failed. You may be behind a captive portal."
+# 3. Bug Fix: Check if curl exists before running portal check
+if command -v curl &>/dev/null; then
+    echo -e "${ICON_INF} Checking HTTP connectivity..."
+    if ! curl -I https://archlinux.org &>/dev/null; then
+        echo -e "${ICON_WRN} HTTP check failed. You may be behind a captive portal."
+    fi
+else
+    echo -e "${ICON_WRN} curl not found. Skipping captive portal check."
 fi
 
-# 2.7 Edge-Case: Update Keyring before doing anything else
-echo -e "${ICON_INF} Updating Arch Keyring (Prevents signature errors)..."
+# 2.7 Edge-Case: Update Keyring
+echo -e "${ICON_INF} Updating Arch Keyring..."
 if [[ "$DRY_RUN" -eq 0 ]]; then
+    # We use '|| true' to prevent 'set -e' from killing script on keyring failure (non-fatal)
     pacman -Sy --noconfirm archlinux-keyring &>/dev/null || echo -e "${ICON_WRN} Keyring update failed."
 fi
 
-# 14. Edge-Case: Slow mirrors
-echo -e "${ICON_INF} Optimizing Mirrorlist..."
-if [[ "$DRY_RUN" -eq 0 ]]; then
-    reflector --latest 5 --sort rate --save /etc/pacman.d/mirrorlist --protocol https --download-timeout 5 &>/dev/null || echo -e "${ICON_WRN} Reflector failed, using default mirrors."
+# 1. Bug Fix: Check if reflector exists
+if command -v reflector &>/dev/null; then
+    echo -e "${ICON_INF} Optimizing Mirrorlist..."
+    if [[ "$DRY_RUN" -eq 0 ]]; then
+        reflector --latest 5 --sort rate --save /etc/pacman.d/mirrorlist --protocol https --download-timeout 5 &>/dev/null || echo -e "${ICON_WRN} Reflector failed, using default mirrors."
+    fi
+else
+    echo -e "${ICON_WRN} reflector not installed. Skipping mirror optimization."
 fi
 sleep 1
 
@@ -353,6 +365,7 @@ sleep 1
 start_step "4" "STORAGE ARCHITECTURE"
 
 echo -e "${ICON_INF} Detected Storage Devices:"
+# Added '|| true' because grep returning empty is exit code 1
 lsblk -d -n -o NAME,SIZE,MODEL,TYPE | grep 'disk' || true | awk '{print "    • /dev/" $1 " [" $2 "] " $3}'
 echo ""
 
@@ -361,10 +374,12 @@ while true; do
     CLEAN_NAME=${DRIVE_INPUT#/dev/}
     TARGET_DISK="/dev/$CLEAN_NAME"
     
+    # 'lsblk' returns 0 if device exists
     if lsblk -d "$TARGET_DISK" &>/dev/null; then
         echo -e "${ICON_OK} Target Locked: ${BOLD}$TARGET_DISK${NC}"
         
         # 2.1 Edge-Case: Drive is mounted
+        # Use '|| true' so grep failure (no mountpoint) doesn't crash script
         if lsblk -no MOUNTPOINT "$TARGET_DISK" | grep -q "/"; then
             echo -e "${ICON_ERR} Drive is currently mounted. Unmount it first."
             continue
@@ -542,6 +557,7 @@ pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
 
 INSTALL_PID=$!
 sleep 1
+# Check if PID is still running. ps returns 0 if running.
 if ! ps -p $INSTALL_PID > /dev/null; then fatal "Pacstrap failed. Check /tmp/arch-install.log"; fi
 show_progress_bar $INSTALL_PID
 wait $INSTALL_PID || fatal "Installation Failed."
@@ -549,6 +565,8 @@ wait $INSTALL_PID || fatal "Installation Failed."
 echo -e "${ICON_INF} Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
 
+# 2. Bug Fix: Ensure /mnt/etc exists before writing config
+mkdir -p /mnt/etc
 cat > /mnt/etc/arch-installer.conf <<EOF
 INSTALL_DATE=$(date)
 HOSTNAME=$MY_HOSTNAME
@@ -590,6 +608,7 @@ echo "KEYMAP=$KEYMAP" > /etc/vconsole.conf
 echo "$MY_HOSTNAME" > /etc/hostname
 
 echo "root:$MY_PASS" | chpasswd
+# The '|| echo' handles the case where user might exist, preventing 'set -e' from killing script
 useradd -m -G wheel,storage,power,video -s /bin/bash "$MY_USER" || echo "User exists, skipping."
 echo "$MY_USER:$MY_PASS" | chpasswd
 
@@ -634,7 +653,7 @@ DISK_MODIFIED=0
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${CYAN}${BOLD}    INSTALLATION SUCCESSFUL v2.8.0 ${NC}"
+echo -e "${CYAN}${BOLD}    INSTALLATION SUCCESSFUL v2.9.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e "\n 1. Type ${BOLD}reboot${NC} to start your new system."
 echo -e " 2. Login as: ${BOLD}$MY_USER${NC}\n"

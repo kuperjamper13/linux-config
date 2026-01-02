@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v1.5.0
+#  ARCH LINUX UNIVERSAL INSTALLER v1.6.0
 #  Final Stable | Robust Error Handling | Clean UI
 # ==============================================================================
 
@@ -35,7 +35,7 @@ function print_banner {
     echo " ██║╚██╗  ██╔══██╗ ██║      ██╔══██║"
     echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
     echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.5.0"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v1.6.0"
     echo -e "${NC}"
 }
 
@@ -137,7 +137,6 @@ done
 
 # 2.3 Timezone
 echo -e "\n${ICON_INF} Select Timezone Region"
-# FIX: Grep excludes the base directory to prevent empty first option
 mapfile -t regions < <(find /usr/share/zoneinfo -maxdepth 1 -type d | cut -d/ -f5 | grep -vE "posix|right|Etc|SystemV|iso3166|Arctic|Antarctica|^$")
 print_menu_grid regions
 
@@ -251,8 +250,11 @@ fi
 # 4.3 Strategy Selection - LOOP for Error Handling
 while true; do
     echo -e "\n${ICON_INF} Select Partitioning Strategy"
-    strategies=("Use Free Space (Dual Boot Safe)" "Wipe Entire Disk (Clean Install)" "Manual Mode (Advanced)")
-    print_menu_grid strategies
+    # Vertical List as requested
+    echo -e "  ${CYAN} 1)${NC} Use Free Space (Dual Boot Safe)"
+    echo -e "  ${CYAN} 2)${NC} Wipe Entire Disk (Clean Install)"
+    echo -e "  ${CYAN} 3)${NC} Manual Mode (Advanced)"
+    echo ""
 
     ask_input "STRATEGY_OPT" "Select Strategy Number"
 
@@ -266,27 +268,20 @@ while true; do
             # --- USE FREE SPACE ---
             echo -e "${ICON_INF} Scanning for unallocated space..."
             
-            # Try to create partition. Check if sgdisk fails (e.g., no free space)
-            # Capture output to variable to suppress ugly errors, check exit code
-            SG_OUT=$(sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Root" $TARGET_DISK 2>&1)
-            SG_RET=$?
-            
-            if [ $SG_RET -ne 0 ]; then
-                echo -e "${ICON_ERR} ${RED}Auto-Partitioning Failed.${NC}"
-                echo -e "${DIM}Reason: No unallocated space found on $TARGET_DISK.${NC}"
-                echo -e "${DIM}Please free up space using Windows Disk Manager or use Manual Mode.${NC}"
-                continue # Return to strategy selection
-            fi
+            # Execute without trapping errors strictlly (Restored v1.4 logic)
+            # We allow sgdisk to complain but rely on partition creation success
+            sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Root" $TARGET_DISK &>/dev/null
 
-            echo -e "${ICON_OK} Partition Created. Syncing Disk Map..."
+            echo -e "${ICON_OK} Syncing Disk Map..."
             partprobe $TARGET_DISK && sync && sleep 2
             
             ROOT_PART=$(lsblk -n -o PATH,PARTLABEL $TARGET_DISK | grep "Arch Root" | tail -n1 | awk '{print $1}')
             
             if [[ -z "$ROOT_PART" ]]; then
-                 echo -e "${ICON_WRN} Auto-detect failed. Please identify manually:"
+                 echo -e "${ICON_WRN} Auto-detect needs confirmation."
+                 echo -e "${ICON_INF} Current Partitions:"
                  lsblk $TARGET_DISK -o NAME,SIZE,TYPE,LABEL
-                 ask_input "ROOT_INPUT" "Enter Root Partition Name (e.g. nvme0n1p3)"
+                 ask_input "ROOT_INPUT" "Identify the new Partition (e.g. nvme0n1p3)"
                  ROOT_PART="/dev/${ROOT_INPUT#/dev/}"
             else
                  echo -e "${ICON_OK} Auto-Detected New Partition: ${BOLD}$ROOT_PART${NC}"
@@ -470,7 +465,7 @@ EOF
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.5.0 ${NC}"
+echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v1.6.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-#  ARCH LINUX UNIVERSAL INSTALLER v2.0.0
-#  v1.9 Aesthetics | v1.5 Stability (Classic Engine)
+#  ARCH LINUX UNIVERSAL INSTALLER v2.1.0
+#  Modern UI (v1.9) | Classic Install Engine (v1.3)
 # ==============================================================================
 
 # --- [1] VISUAL LIBRARY -------------------------------------------------------
@@ -29,13 +29,13 @@ function hard_clear {
 
 function print_banner {
     echo -e "${MAGENTA}"
-    echo " ▄▄▄      ██████╗  ███████╗ ██╗  ██╗"
-    echo " ████╗    ██╔══██╗ ██╔════╝ ██║  ██║"
-    echo " ██╔██╗   ██████╔╝ ██║      ███████║"
-    echo " ██║╚██╗  ██╔══██╗ ██║      ██╔══██║"
-    echo " ██║ ╚██╗ ██║  ██║ ███████╗ ██║  ██║"
-    echo " ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝ ╚═╝  ╚═╝"
-    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.0.0"
+    echo " ▄▄▄        ██████╗  ████████╗ ██╗  ██╗"
+    echo " ████╗      ██╔══██╗ ██╔═════╝ ██║  ██║"
+    echo " ██╔██╗     ██████╔╝ ██║       ███████║"
+    echo " ██║╚██╗    ██╔══██╗ ██║       ██╔══██║"
+    echo " ██║ ╚██╗   ██║  ██║ ████████╗ ██║  ██║"
+    echo " ╚═╝  ╚═╝   ╚═╝  ╚═╝ ╚═══════╝ ╚═╝  ╚═╝"
+    echo "  >> UNIVERSAL INSTALLER SYSTEM v2.1.0"
     echo -e "${NC}"
 }
 
@@ -137,7 +137,6 @@ done
 
 # 2.3 Timezone
 echo -e "\n${ICON_INF} Select Timezone Region"
-# Grep excludes base dir to avoid empty option 1
 mapfile -t regions < <(find /usr/share/zoneinfo -maxdepth 1 -type d | cut -d/ -f5 | grep -vE "posix|right|Etc|SystemV|iso3166|Arctic|Antarctica|^$")
 print_menu_grid regions
 
@@ -267,7 +266,6 @@ while true; do
         1)
             # --- USE FREE SPACE ---
             echo -e "${ICON_INF} Scanning for unallocated space..."
-            # Execute logic from v1.6 (Robust Mode)
             sgdisk -n 0:0:0 -t 0:8304 -c 0:"Arch Root" $TARGET_DISK &>/dev/null
 
             echo -e "${ICON_OK} Syncing Disk Map..."
@@ -357,7 +355,7 @@ ask_input "CONFIRM" "Type 'yes' to proceed with installation"
 [[ "$CONFIRM" != "yes" ]] && exit 1
 
 # ==============================================================================
-# SECTION 5: INSTALLATION PROCESS (CLASSIC V1.5 ENGINE)
+# SECTION 5: INSTALLATION PROCESS (CLASSIC ENGINE v1.3/v1.5)
 # ==============================================================================
 start_step "5" "CORE INSTALLATION"
 
@@ -376,13 +374,13 @@ else
 fi
 
 # 5.3 Mounting
-echo -e "${ICON_INF} Mounting Partitions to /mnt..."
+echo -e "${ICON_INF} Mounting Partitions..."
 mount $ROOT_PART /mnt
 mkdir -p /mnt/boot
 mount $EFI_PART /mnt/boot
 
 # 5.4 CPU Detection
-echo -e "${ICON_INF} Detecting Processor Architecture..."
+echo -e "${ICON_INF} Detecting CPU..."
 if grep -q "AuthenticAMD" /proc/cpuinfo; then
     UCODE="amd-ucode"
     echo -e "${ICON_OK} AMD CPU Detected."
@@ -391,18 +389,14 @@ else
     echo -e "${ICON_OK} Intel CPU Detected."
 fi
 
-# 5.5 Base Install (RESTORED V1.5 LOGIC - NO REFLECTOR, NO KEYRING)
-echo -e "${ICON_INF} Downloading and Installing Base System..."
-echo -e "${DIM} (Output visible to track progress)${NC}"
-
-# Using the EXACT simple command from v1.5
-# But WITHOUT '&>/dev/null' so you can see it working
+# 5.5 Base Install
+echo -e "${ICON_INF} Installing Base System (This may take time)..."
 pacstrap /mnt base linux-zen linux-zen-headers linux-firmware base-devel \
     $UCODE mesa pipewire pipewire-alsa pipewire-pulse wireplumber \
     networkmanager bluez bluez-utils power-profiles-daemon \
-    git nano ntfs-3g dosfstools mtools
+    git nano ntfs-3g dosfstools mtools &>/dev/null
 
-echo -e "\n${ICON_OK} Core packages installed."
+echo -e "${ICON_OK} Core packages installed."
 echo -e "${ICON_INF} Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
 
@@ -467,7 +461,7 @@ EOF
 hard_clear
 print_banner
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v2.0.0 ${NC}"
+echo -e "${GREEN}${BOLD}   INSTALLATION SUCCESSFUL v2.1.0 ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════════════════════════${NC}"
 echo -e ""
 echo -e " 1. Remove installation media."

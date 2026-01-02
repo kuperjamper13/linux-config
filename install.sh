@@ -41,7 +41,7 @@ function show_header {
     echo "  ░    ▒     ░░   ░ ░          ░  ░░ ░"
     echo "       ░  ░   ░      ░ ░       ░  ░  ░"
     echo -e "${NC}"
-    echo -e "${CYAN}   // ARCH LINUX INSTALLER v5.0 (GOLD MASTER) //${NC}"
+    echo -e "${CYAN}   // ARCH LINUX INSTALLER v5.0 //${NC}"
     draw_line
 }
 
